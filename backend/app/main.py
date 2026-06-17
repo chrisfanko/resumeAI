@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import analyze, users
+from app.routers import analyze, users, resume_builder
 
 app = FastAPI(
     title="AI Resume Analyzer",
@@ -18,6 +18,7 @@ app.add_middleware(
 
 app.include_router(analyze.router, prefix="/api", tags=["Analysis"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(resume_builder.router, prefix="/api", tags=["Resume Builder"])
 
 @app.get("/")
 def root():
