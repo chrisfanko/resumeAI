@@ -2,40 +2,27 @@
 import { useState } from "react";
 import axios from "axios";
 import Link from "next/link";
+import Navbar from "../Navbar";
+import { Upload, Briefcase, Building2, FileText, ArrowRight, Loader2, AlertCircle, Copy, Check, Download } from "lucide-react";
 
 export default function CoverLetter() {
-  const [file, setFile] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [jobTitle, setJobTitle] = useState("");
+  const [file, setFile]               = useState(null);
+  const [dragOver, setDragOver]       = useState(false);
+  const [jobTitle, setJobTitle]       = useState("");
   const [companyName, setCompanyName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
-  const [copied, setCopied] = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState(null);
+  const [result, setResult]           = useState(null);
+  const [copied, setCopied]           = useState(false);
 
-  const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    if (selected) setFile(selected);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    const dropped = e.dataTransfer.files[0];
-    if (dropped) setFile(dropped);
-  };
+  const handleDrop = (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setFile(f); };
 
   const handleGenerate = async () => {
     if (!file || !jobTitle || !companyName || !jobDescription.trim()) {
-      setError("Please fill in all fields and upload your resume.");
-      return;
+      setError("Please fill in all fields and upload your resume."); return;
     }
-
-    setError(null);
-    setLoading(true);
-    setResult(null);
-
+    setError(null); setLoading(true); setResult(null);
     try {
       const token = localStorage.getItem("token");
       const formData = new FormData();
@@ -43,212 +30,149 @@ export default function CoverLetter() {
       formData.append("job_title", jobTitle);
       formData.append("company_name", companyName);
       formData.append("job_description", jobDescription);
-
-      const response = await axios.post("/api/cover-letter", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
+      const res = await axios.post("/api/cover-letter", formData, {
+        headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${token}` }
       });
-
-      setResult(response.data);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Something went wrong. Try again.");
-    } finally {
-      setLoading(false);
-    }
+      setResult(res.data);
+    } catch (err) { setError(err.response?.data?.detail || "Something went wrong. Try again."); }
+    finally { setLoading(false); }
   };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(result.cover_letter);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
     const blob = new Blob([result.cover_letter], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `cover_letter_${result.company_name}.txt`;
-    a.click();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = `cover_letter_${result.company_name}.txt`; a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-
-      {/* Navbar */}
-      <nav className="flex justify-between items-center px-8 py-6 border-b border-white/10">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-sm font-bold">AI</div>
-          <span className="font-bold text-lg">ResumeAI</span>
-        </Link>
-        <div className="flex gap-4 items-center">
-          <Link href="/dashboard" className="text-white/70 hover:text-white transition px-4 py-2">Dashboard</Link>
-          <Link href="/analyze" className="bg-purple-600 hover:bg-purple-700 transition px-4 py-2 rounded-lg font-medium">
-            Analyze Resume
-          </Link>
-        </div>
-      </nav>
-
-      <div className="max-w-5xl mx-auto px-6 py-12">
+    <main className="page-shell">
+      <Navbar />
+      <div className="container-center py-10">
 
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-block bg-purple-500/20 border border-purple-500/30 rounded-full px-4 py-1 text-purple-300 text-sm mb-4">
-            Powered by Llama 3
-          </div>
-          <h1 className="text-4xl font-extrabold mb-4">Cover Letter Generator</h1>
-          <p className="text-white/60 text-lg">Upload your resume, fill in the job details and get a personalized professional cover letter in seconds.</p>
+        <div style={{ marginBottom: 32 }}>
+          <span className="section-tag">AI-Powered</span>
+          <h1 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: "clamp(1.6rem, 2.5vw, 2rem)", letterSpacing: "-0.025em", color: "#111827" }}>
+            Cover letter generator
+          </h1>
+          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 14, marginTop: 4 }}>
+            Upload your resume, add the job details — get a personalized cover letter in seconds.
+          </p>
         </div>
 
         {!result ? (
-          <div className="space-y-6">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-            {/* Resume Upload */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="font-bold text-lg mb-4">1. Upload Your Resume</h2>
+            {/* Upload */}
+            <div className="card" style={{ padding: 24 }}>
+              <div className="flex items-center gap-2 mb-4">
+                <div style={{ width: 28, height: 28, background: "#f0fdf4", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <FileText size={14} color="#16a34a" />
+                </div>
+                <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 14, color: "#111827" }}>Upload your resume</h2>
+              </div>
               <div
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                className={`upload-zone ${dragOver ? "drag-over" : ""}`}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
-                onClick={() => document.getElementById("clFileInput").click()}
-                className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition
-                  ${dragOver ? "border-purple-400 bg-purple-500/20" : "border-white/20 hover:border-purple-400 hover:bg-white/5"}`}
+                onClick={() => document.getElementById("clFile").click()}
               >
-                <div className="text-4xl mb-3">📄</div>
-                {file ? (
-                  <div>
-                    <p className="text-purple-300 font-semibold">{file.name}</p>
-                    <p className="text-white/40 text-sm mt-1">Click to change</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-white/70 font-medium">Drag & drop or click to upload</p>
-                    <p className="text-white/30 text-xs mt-2">PDF or DOCX</p>
-                  </div>
-                )}
-                <input id="clFileInput" type="file" accept=".pdf,.docx" onChange={handleFileChange} className="hidden" />
+                <Upload size={24} color={file ? "#16a34a" : "#94a3b8"} style={{ margin: "0 auto 10px" }} />
+                {file
+                  ? <p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#16a34a" }}>{file.name}</p>
+                  : <><p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#374151" }}>Drag & drop or click to upload</p><p style={{ fontFamily: "'Lato', sans-serif", fontSize: 12, color: "#94a3b8", marginTop: 4 }}>PDF or DOCX</p></>}
+                <input id="clFile" type="file" accept=".pdf,.docx" onChange={e => { const f = e.target.files[0]; if (f) setFile(f); }} className="hidden" />
               </div>
             </div>
 
-            {/* Job Details */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="font-bold text-lg mb-4">2. Job Details</h2>
+            {/* Job details */}
+            <div className="card" style={{ padding: 24 }}>
+              <div className="flex items-center gap-2 mb-4">
+                <div style={{ width: 28, height: 28, background: "#f0fdf4", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Briefcase size={14} color="#16a34a" />
+                </div>
+                <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 14, color: "#111827" }}>Job details</h2>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="text-white/60 text-sm mb-2 block">Job Title</label>
-                  <input
-                    type="text"
-                    value={jobTitle}
-                    onChange={(e) => setJobTitle(e.target.value)}
-                    placeholder="e.g. Frontend Developer"
-                    className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-purple-400 transition"
-                  />
+                  <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>Job title</label>
+                  <div style={{ position: "relative" }}>
+                    <Briefcase size={14} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+                    <input type="text" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="e.g. Frontend Developer" className="input" style={{ paddingLeft: 34 }} />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-white/60 text-sm mb-2 block">Company Name</label>
-                  <input
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="e.g. Google"
-                    className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-purple-400 transition"
-                  />
+                  <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>Company name</label>
+                  <div style={{ position: "relative" }}>
+                    <Building2 size={14} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+                    <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="e.g. Google" className="input" style={{ paddingLeft: 34 }} />
+                  </div>
                 </div>
               </div>
+
               <div>
-                <label className="text-white/60 text-sm mb-2 block">Job Description</label>
-                <textarea
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
-                  placeholder="Paste the full job description here..."
-                  className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 resize-none focus:outline-none focus:border-purple-400 transition"
-                  rows={6}
-                />
+                <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>Job description</label>
+                <textarea value={jobDescription} onChange={e => setJobDescription(e.target.value)} placeholder="Paste the full job description here…" className="textarea" rows={6} />
               </div>
             </div>
 
-            {/* Error */}
             {error && (
-              <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-red-300 text-center">
-                {error}
+              <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                <AlertCircle size={15} color="#991b1b" />
+                <p style={{ fontFamily: "'Lato', sans-serif", color: "#991b1b", fontSize: 13 }}>{error}</p>
               </div>
             )}
 
-            {/* Submit */}
-            <div className="text-center">
-              <button
-                onClick={handleGenerate}
-                disabled={loading}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 disabled:opacity-50 transition px-12 py-4 rounded-xl font-semibold text-lg"
-              >
-                {loading ? "Generating... ⏳" : "Generate Cover Letter →"}
+            <div style={{ textAlign: "center" }}>
+              <button onClick={handleGenerate} disabled={loading} className="btn-primary" style={{ padding: "13px 36px", fontSize: 15 }}>
+                {loading ? <><Loader2 size={15} className="animate-spin" /> Generating…</> : <>Generate cover letter <ArrowRight size={15} /></>}
               </button>
             </div>
-
           </div>
         ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          /* Result */
-          <div className="space-y-6">
-
-            {/* Header */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            {/* Result header */}
+            <div className="card" style={{ padding: "18px 24px", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
               <div>
-                <h2 className="font-bold text-xl">Your Cover Letter</h2>
-                <p className="text-white/40 text-sm mt-1">
+                <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 16, color: "#111827" }}>Your cover letter</h2>
+                <p style={{ fontFamily: "'Lato', sans-serif", fontSize: 13, color: "#64748b", marginTop: 2 }}>
                   {result.job_title} at {result.company_name}
                 </p>
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCopy}
-                  className="bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-300 px-4 py-2 rounded-lg text-sm font-medium transition"
-                >
-                  {copied ? "✅ Copied!" : "📋 Copy"}
+              <div className="flex gap-2">
+                <button onClick={handleCopy} className="btn-secondary" style={{ padding: "8px 16px", fontSize: 13 }}>
+                  {copied ? <><Check size={13} color="#16a34a" /> Copied</> : <><Copy size={13} /> Copy</>}
                 </button>
-                <button
-                  onClick={handleDownload}
-                  className="bg-green-600/20 hover:bg-green-600/40 border border-green-500/30 text-green-300 px-4 py-2 rounded-lg text-sm font-medium transition"
-                >
-                  ⬇️ Download
+                <button onClick={handleDownload} className="btn-primary" style={{ padding: "8px 16px", fontSize: 13 }}>
+                  <Download size={13} /> Download
                 </button>
               </div>
             </div>
 
-            {/* Cover Letter Content */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
-              <div className="bg-white text-gray-800 rounded-xl p-8 font-serif leading-relaxed">
-                <pre className="whitespace-pre-wrap font-serif text-gray-800 leading-relaxed text-sm md:text-base">
+            {/* Letter */}
+            <div className="card" style={{ padding: 32 }}>
+              <div style={{ background: "white", borderRadius: 10, border: "1px solid #e2e8f0", padding: "36px 40px" }}>
+                <pre style={{ fontFamily: "'Lato', sans-serif", fontSize: 14, color: "#111827", whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
                   {result.cover_letter}
                 </pre>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-wrap gap-4 justify-center">
-              <button
-                onClick={() => setResult(null)}
-                className="bg-purple-600 hover:bg-purple-700 transition px-8 py-3 rounded-xl font-semibold"
-              >
-                Generate Another
-              </button>
-              <Link
-                href="/analyze"
-                className="border border-white/20 hover:border-white/40 transition px-8 py-3 rounded-xl font-semibold"
-              >
-                Analyze Resume
-              </Link>
-              <Link
-                href="/dashboard"
-                className="border border-white/20 hover:border-white/40 transition px-8 py-3 rounded-xl font-semibold"
-              >
-                Dashboard
-              </Link>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <button onClick={() => setResult(null)} className="btn-primary">Generate another</button>
+              <Link href="/analyze" className="btn-secondary">Analyze resume</Link>
+              <Link href="/dashboard" className="btn-secondary">Dashboard</Link>
             </div>
-
           </div>
         )}
       </div>
