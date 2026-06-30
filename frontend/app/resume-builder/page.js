@@ -6,7 +6,7 @@ import Navbar from "../Navbar";
 import {
   User, Briefcase, GraduationCap, Wrench,
   Eye, ChevronRight, ChevronLeft, Sparkles,
-  Plus, Trash2, FileText, Copy, Check, Loader2
+  Plus, Trash2, FileText, Copy, Check, Loader2, Download
 } from "lucide-react";
 
 const STEPS = [
@@ -104,6 +104,92 @@ export default function ResumeBuilder() {
   };
 
   const handleCopy = () => { navigator.clipboard.writeText(builtResume); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const loadJsPdf = () => new Promise((resolve, reject) => {
+    if (window.jspdf) return resolve(window.jspdf);
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    script.onload = () => resolve(window.jspdf);
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const { jsPDF } = await loadJsPdf();
+      const doc = new jsPDF({ unit: "pt", format: "letter" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 56;
+      const maxWidth = pageWidth - margin * 2;
+      let y = 64;
+
+      // Name header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.setTextColor(17, 24, 39);
+      doc.text(personal.full_name || "Resume", margin, y);
+      y += 22;
+
+      // Contact line
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      const contactParts = [personal.email, personal.phone, personal.location, personal.linkedin, personal.website].filter(Boolean);
+      doc.text(contactParts.join("  |  "), margin, y);
+      y += 18;
+
+      doc.setDrawColor(22, 163, 74);
+      doc.setLineWidth(1.2);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 24;
+
+      // Body text from AI-built resume, parsed line by line
+      const lines = builtResume.split("\n");
+      doc.setTextColor(31, 41, 55);
+
+      for (let raw of lines) {
+        const line = raw.trimEnd();
+        if (y > 740) { doc.addPage(); y = 56; }
+
+        if (line.trim() === "") { y += 8; continue; }
+
+        const isHeader = /^[A-Z0-9 .,&/'-]{3,}$/.test(line.trim()) && line.trim().length < 40;
+
+        if (isHeader) {
+          y += 6;
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(12);
+          doc.setTextColor(22, 163, 74);
+          doc.text(line.trim(), margin, y);
+          y += 6;
+          doc.setDrawColor(220, 252, 231);
+          doc.setLineWidth(0.8);
+          doc.line(margin, y, pageWidth - margin, y);
+          y += 16;
+        } else {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10.5);
+          doc.setTextColor(55, 65, 81);
+          const wrapped = doc.splitTextToSize(line, maxWidth);
+          for (const w of wrapped) {
+            if (y > 740) { doc.addPage(); y = 56; }
+            doc.text(w, margin, y);
+            y += 14;
+          }
+        }
+      }
+
+      const safeName = (personal.full_name || "resume").trim().replace(/\s+/g, "_");
+      doc.save(`${safeName}_resume.pdf`);
+    } catch (e) {
+      setBuildError("Could not generate PDF. Please try again.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const canNext = () => {
     if (step === 0) return personal.full_name && personal.email && personal.phone && personal.location;
@@ -260,7 +346,10 @@ export default function ResumeBuilder() {
                 <button onClick={handleCopy} className="btn-secondary" style={{ padding: "7px 14px", fontSize: 13 }}>
                   {copied ? <><Check size={13} color="#16a34a" /> Copied</> : <><Copy size={13} /> Copy</>}
                 </button>
-                <button onClick={handleBuildResume} className="btn-primary" style={{ padding: "7px 14px", fontSize: 13 }}>
+                <button onClick={handleDownloadPdf} disabled={downloadingPdf} className="btn-primary" style={{ padding: "7px 14px", fontSize: 13 }}>
+                  {downloadingPdf ? <><Loader2 size={13} className="animate-spin" /> Preparing…</> : <><Download size={13} /> Download PDF</>}
+                </button>
+                <button onClick={handleBuildResume} className="btn-secondary" style={{ padding: "7px 14px", fontSize: 13 }}>
                   <Sparkles size={13} /> Regenerate
                 </button>
               </div>

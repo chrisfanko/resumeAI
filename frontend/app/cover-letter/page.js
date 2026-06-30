@@ -43,12 +43,55 @@ export default function CoverLetter() {
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownload = () => {
-    const blob = new Blob([result.cover_letter], { type: "text/plain" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url; a.download = `cover_letter_${result.company_name}.txt`; a.click();
-    URL.revokeObjectURL(url);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const loadJsPdf = () => new Promise((resolve, reject) => {
+    if (window.jspdf) return resolve(window.jspdf);
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    script.onload = () => resolve(window.jspdf);
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+
+  const handleDownload = async () => {
+    setDownloadingPdf(true);
+    try {
+      const { jsPDF } = await loadJsPdf();
+      const doc = new jsPDF({ unit: "pt", format: "letter" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 64;
+      const maxWidth = pageWidth - margin * 2;
+      let y = 80;
+
+      doc.setFont("times", "normal");
+      doc.setFontSize(11.5);
+      doc.setTextColor(17, 24, 39);
+
+      const paragraphs = result.cover_letter.split("\n");
+      for (const para of paragraphs) {
+        if (para.trim() === "") { y += 14; continue; }
+        const wrapped = doc.splitTextToSize(para, maxWidth);
+        for (const line of wrapped) {
+          if (y > 740) { doc.addPage(); y = 80; }
+          doc.text(line, margin, y);
+          y += 16;
+        }
+        y += 6;
+      }
+
+      const safeCompany = (result.company_name || "company").trim().replace(/\s+/g, "_");
+      doc.save(`cover_letter_${safeCompany}.pdf`);
+    } catch (e) {
+      // fallback to txt if PDF generation fails
+      const blob = new Blob([result.cover_letter], { type: "text/plain" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = `cover_letter_${result.company_name}.txt`; a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   return (
@@ -153,8 +196,8 @@ export default function CoverLetter() {
                 <button onClick={handleCopy} className="btn-secondary" style={{ padding: "8px 16px", fontSize: 13 }}>
                   {copied ? <><Check size={13} color="#16a34a" /> Copied</> : <><Copy size={13} /> Copy</>}
                 </button>
-                <button onClick={handleDownload} className="btn-primary" style={{ padding: "8px 16px", fontSize: 13 }}>
-                  <Download size={13} /> Download
+                <button onClick={handleDownload} disabled={downloadingPdf} className="btn-primary" style={{ padding: "8px 16px", fontSize: 13 }}>
+                  {downloadingPdf ? <><Loader2 size={13} className="animate-spin" /> Preparing…</> : <><Download size={13} /> Download PDF</>}
                 </button>
               </div>
             </div>
