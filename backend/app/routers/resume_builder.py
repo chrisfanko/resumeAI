@@ -106,7 +106,7 @@ Return ONLY the improved bullet point, nothing else."""
 
     completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         max_tokens=200,
     )
 
@@ -146,7 +146,7 @@ Return ONLY the summary paragraph, nothing else."""
 
     completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         max_tokens=200,
     )
 
@@ -216,7 +216,7 @@ Instructions:
 
     completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         max_tokens=2000,
     )
 

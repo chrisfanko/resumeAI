@@ -1,432 +1,765 @@
 "use client";
-import { useState } from "react";
-import Link from "next/link";
+
+import { useMemo, useState } from "react";
 import axios from "axios";
 import Navbar from "../Navbar";
 import {
-  User, Briefcase, GraduationCap, Wrench,
-  Eye, ChevronRight, ChevronLeft, Sparkles,
-  Plus, Trash2, FileText, Copy, Check, Loader2, Download
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  FileText,
+  GraduationCap,
+  Loader2,
+  PenLine,
+  Plus,
+  Sparkles,
+  Trash2,
+  UserRound,
+  WandSparkles,
 } from "lucide-react";
 
-const STEPS = [
-  { id: "personal",   label: "Personal",   icon: User },
-  { id: "experience", label: "Experience", icon: Briefcase },
-  { id: "education",  label: "Education",  icon: GraduationCap },
-  { id: "skills",     label: "Skills",     icon: Wrench },
-  { id: "preview",    label: "Preview",    icon: Eye },
+const emptyExperience = () => ({
+  job_title: "",
+  company: "",
+  location: "",
+  start_date: "",
+  end_date: "",
+  description: "",
+});
+
+const emptyEducation = () => ({
+  degree: "",
+  institution: "",
+  location: "",
+  graduation_year: "",
+  gpa: "",
+});
+
+const steps = [
+  { label: "Profile", icon: UserRound },
+  { label: "Experience", icon: PenLine },
+  { label: "Education & skills", icon: GraduationCap },
+  { label: "Review", icon: FileText },
 ];
 
-const emptyExperience = () => ({ job_title: "", company: "", location: "", start_date: "", end_date: "", description: "" });
-const emptyEducation  = () => ({ degree: "", institution: "", location: "", graduation_year: "", gpa: "" });
-
-function Field({ label, value, onChange, placeholder, type = "text", required }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151" }}>
-        {label}{required && <span style={{ color: "#16a34a", marginLeft: 3 }}>*</span>}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="input"
-      />
-    </div>
-  );
-}
-
 export default function ResumeBuilder() {
-  const [step, setStep]               = useState(0);
-  const [copied, setCopied]           = useState(false);
-  const [building, setBuilding]       = useState(false);
-  const [builtResume, setBuiltResume] = useState("");
-  const [buildError, setBuildError]   = useState("");
-  const [personal, setPersonal]       = useState({ full_name: "", email: "", phone: "", location: "", linkedin: "", website: "", summary: "" });
-  const [experiences, setExperiences] = useState([emptyExperience()]);
-  const [enhancing, setEnhancing]     = useState({});
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [educations, setEducations]   = useState([emptyEducation()]);
-  const [skillInput, setSkillInput]   = useState("");
-  const [skills, setSkills]           = useState([]);
-  const [targetRole, setTargetRole]   = useState("");
+  const [activeStep, setActiveStep] = useState(0);
+  const [loadingAction, setLoadingAction] = useState("");
+  const [error, setError] = useState("");
+  const [resumeText, setResumeText] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const getAuthHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
-  const setP   = (key) => (val) => setPersonal(p => ({ ...p, [key]: val }));
-  const setExp = (i, key) => (val) => setExperiences(exps => exps.map((e, idx) => idx === i ? { ...e, [key]: val } : e));
-  const setEdu = (i, key) => (val) => setEducations(eds => eds.map((e, idx) => idx === i ? { ...e, [key]: val } : e));
-
-  const addSkill = () => {
-    const t = skillInput.trim();
-    if (t && !skills.includes(t)) setSkills(s => [...s, t]);
-    setSkillInput("");
-  };
-
-  const handleEnhanceBullet = async (i) => {
-    const exp = experiences[i];
-    if (!exp.description.trim()) return;
-    setEnhancing(h => ({ ...h, [`exp-${i}`]: true }));
-    try {
-      const res = await axios.post("/api/resume/enhance-bullet", {
-        bullet_text: exp.description, job_title: exp.job_title || "Professional",
-        company: exp.company || "Company", target_role: targetRole,
-      }, { headers: getAuthHeader() });
-      setExp(i, "description")(res.data.enhanced);
-    } catch {}
-    finally { setEnhancing(h => ({ ...h, [`exp-${i}`]: false })); }
-  };
-
-  const handleGenerateSummary = async () => {
-    setSummaryLoading(true);
-    try {
-      const res = await axios.post("/api/resume/generate-summary", {
-        full_name: personal.full_name || "Candidate",
-        target_job_title: targetRole || "Professional",
-        skills, years_of_experience: Math.max(1, experiences.length * 2),
-        key_achievements: experiences.map(e => e.description).join(". "),
-      }, { headers: getAuthHeader() });
-      setP("summary")(res.data.summary);
-    } catch {}
-    finally { setSummaryLoading(false); }
-  };
-
-  const handleBuildResume = async () => {
-    setBuilding(true); setBuildError("");
-    try {
-      const res = await axios.post("/api/resume/build", {
-        personal_info: personal, experiences, educations, skills,
-        target_job_title: targetRole, target_job_description: "",
-      }, { headers: getAuthHeader() });
-      setBuiltResume(res.data.resume_text);
-    } catch { setBuildError("Could not build resume. Make sure you are logged in and the backend is running."); }
-    finally { setBuilding(false); }
-  };
-
-  const handleCopy = () => { navigator.clipboard.writeText(builtResume); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
-
-  const loadJsPdf = () => new Promise((resolve, reject) => {
-    if (window.jspdf) return resolve(window.jspdf);
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-    script.onload = () => resolve(window.jspdf);
-    script.onerror = reject;
-    document.body.appendChild(script);
+  const [personalInfo, setPersonalInfo] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    location: "",
+    linkedin: "",
+    website: "",
+    summary: "",
   });
 
-  const handleDownloadPdf = async () => {
-    setDownloadingPdf(true);
+  const [target, setTarget] = useState({
+    jobTitle: "",
+    jobDescription: "",
+  });
+
+  const [experiences, setExperiences] = useState([emptyExperience()]);
+  const [educations, setEducations] = useState([emptyEducation()]);
+  const [skillsInput, setSkillsInput] = useState("");
+
+  const skills = useMemo(
+    () =>
+      skillsInput
+        .split(",")
+        .map((skill) => skill.trim())
+        .filter(Boolean),
+    [skillsInput]
+  );
+
+  const tokenHeader = () => ({
+    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+  });
+
+  const updatePersonalInfo = (field, value) => {
+    setPersonalInfo((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateTarget = (field, value) => {
+    setTarget((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateExperience = (index, field, value) => {
+    setExperiences((current) =>
+      current.map((experience, experienceIndex) =>
+        experienceIndex === index
+          ? { ...experience, [field]: value }
+          : experience
+      )
+    );
+  };
+
+  const updateEducation = (index, field, value) => {
+    setEducations((current) =>
+      current.map((education, educationIndex) =>
+        educationIndex === index ? { ...education, [field]: value } : education
+      )
+    );
+  };
+
+  const enhanceBullet = async (index) => {
+    const experience = experiences[index];
+
+    if (!experience.description.trim()) {
+      setError("Add an experience description before using AI Enhance.");
+      return;
+    }
+
+    setLoadingAction(`enhance-${index}`);
+    setError("");
+
     try {
-      const { jsPDF } = await loadJsPdf();
-      const doc = new jsPDF({ unit: "pt", format: "letter" });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 56;
-      const maxWidth = pageWidth - margin * 2;
-      let y = 64;
+      const response = await axios.post(
+        "/api/resume/enhance-bullet",
+        {
+          bullet_text: experience.description,
+          job_title: experience.job_title,
+          company: experience.company,
+          target_role: target.jobTitle,
+        },
+        tokenHeader()
+      );
 
-      // Name header
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(20);
-      doc.setTextColor(17, 24, 39);
-      doc.text(personal.full_name || "Resume", margin, y);
-      y += 22;
-
-      // Contact line
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.setTextColor(100, 116, 139);
-      const contactParts = [personal.email, personal.phone, personal.location, personal.linkedin, personal.website].filter(Boolean);
-      doc.text(contactParts.join("  |  "), margin, y);
-      y += 18;
-
-      doc.setDrawColor(22, 163, 74);
-      doc.setLineWidth(1.2);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 24;
-
-      // Body text from AI-built resume, parsed line by line
-      const lines = builtResume.split("\n");
-      doc.setTextColor(31, 41, 55);
-
-      for (let raw of lines) {
-        const line = raw.trimEnd();
-        if (y > 740) { doc.addPage(); y = 56; }
-
-        if (line.trim() === "") { y += 8; continue; }
-
-        const isHeader = /^[A-Z0-9 .,&/'-]{3,}$/.test(line.trim()) && line.trim().length < 40;
-
-        if (isHeader) {
-          y += 6;
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(12);
-          doc.setTextColor(22, 163, 74);
-          doc.text(line.trim(), margin, y);
-          y += 6;
-          doc.setDrawColor(220, 252, 231);
-          doc.setLineWidth(0.8);
-          doc.line(margin, y, pageWidth - margin, y);
-          y += 16;
-        } else {
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(10.5);
-          doc.setTextColor(55, 65, 81);
-          const wrapped = doc.splitTextToSize(line, maxWidth);
-          for (const w of wrapped) {
-            if (y > 740) { doc.addPage(); y = 56; }
-            doc.text(w, margin, y);
-            y += 14;
-          }
-        }
-      }
-
-      const safeName = (personal.full_name || "resume").trim().replace(/\s+/g, "_");
-      doc.save(`${safeName}_resume.pdf`);
-    } catch (e) {
-      setBuildError("Could not generate PDF. Please try again.");
+      updateExperience(index, "description", response.data.enhanced);
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.detail ||
+          "AI Enhance failed. Please make sure the backend is running."
+      );
     } finally {
-      setDownloadingPdf(false);
+      setLoadingAction("");
     }
   };
 
-  const canNext = () => {
-    if (step === 0) return personal.full_name && personal.email && personal.phone && personal.location;
-    if (step === 1) return experiences.every(e => e.job_title && e.company && e.start_date && e.end_date);
-    if (step === 2) return educations.every(e => e.degree && e.institution && e.graduation_year);
-    if (step === 3) return skills.length > 0;
-    return true;
+  const generateSummary = async () => {
+    if (!personalInfo.full_name.trim() || !target.jobTitle.trim()) {
+      setError("Add your name and target job title before generating a summary.");
+      return;
+    }
+
+    setLoadingAction("summary");
+    setError("");
+
+    try {
+      const response = await axios.post(
+        "/api/resume/generate-summary",
+        {
+          full_name: personalInfo.full_name,
+          target_job_title: target.jobTitle,
+          skills,
+          years_of_experience: 0,
+          key_achievements: experiences
+            .map((experience) => experience.description)
+            .filter(Boolean)
+            .join(" "),
+        },
+        tokenHeader()
+      );
+
+      updatePersonalInfo("summary", response.data.summary);
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.detail ||
+          "We could not generate a summary right now."
+      );
+    } finally {
+      setLoadingAction("");
+    }
   };
 
-  const SUGGESTIONS = ["Python", "JavaScript", "React", "SQL", "Node.js", "Git", "Docker", "AWS", "TypeScript", "Figma", "Excel", "Communication"];
+  const buildResume = async () => {
+    if (!personalInfo.full_name.trim()) {
+      setError("Add your name before building your resume.");
+      setActiveStep(0);
+      return;
+    }
 
-  const renderStep = () => {
-    if (step === 0) return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Full Name"           required value={personal.full_name} onChange={setP("full_name")} placeholder="John Doe" />
-        <Field label="Email"               required type="email" value={personal.email} onChange={setP("email")} placeholder="john@example.com" />
-        <Field label="Phone"               required value={personal.phone}    onChange={setP("phone")}    placeholder="+1 555 000 0000" />
-        <Field label="Location"            required value={personal.location} onChange={setP("location")} placeholder="New York, NY" />
-        <Field label="LinkedIn URL"                 value={personal.linkedin} onChange={setP("linkedin")} placeholder="linkedin.com/in/johndoe" />
-        <Field label="Website / Portfolio"          value={personal.website}  onChange={setP("website")}  placeholder="johndoe.dev" />
-        <Field label="Target Job Title"             value={targetRole}        onChange={setTargetRole}     placeholder="Senior Software Engineer" />
-        <div className="md:col-span-2" style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151" }}>Professional Summary</label>
-            <button onClick={handleGenerateSummary} disabled={summaryLoading} style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 12, color: "#16a34a", background: "none", border: "none", cursor: "pointer", opacity: summaryLoading ? 0.5 : 1 }}>
-              {summaryLoading ? <><Loader2 size={12} className="animate-spin" /> Generating…</> : <><Sparkles size={12} /> AI Generate</>}
-            </button>
-          </div>
-          <textarea value={personal.summary} onChange={e => setP("summary")(e.target.value)} placeholder="Write a short professional summary, or click AI Generate above…" rows={4} className="textarea" />
-        </div>
-      </div>
-    );
+    setLoadingAction("build");
+    setError("");
 
-    if (step === 1) return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {experiences.map((exp, i) => (
-          <div key={i} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, background: "#f8fafc" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13, color: "#374151" }}>Experience {i + 1}</span>
-              {experiences.length > 1 && <button onClick={() => setExperiences(e => e.filter((_, idx) => idx !== i))} style={{ color: "#dc2626", background: "none", border: "none", cursor: "pointer" }}><Trash2 size={15} /></button>}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Field label="Job Title"  required value={exp.job_title}  onChange={setExp(i, "job_title")}  placeholder="Software Engineer" />
-              <Field label="Company"    required value={exp.company}    onChange={setExp(i, "company")}    placeholder="Google" />
-              <Field label="Location"            value={exp.location}   onChange={setExp(i, "location")}   placeholder="Mountain View, CA" />
-              <div />
-              <Field label="Start Date" required value={exp.start_date} onChange={setExp(i, "start_date")} placeholder="Jan 2022" />
-              <Field label="End Date"   required value={exp.end_date}   onChange={setExp(i, "end_date")}   placeholder="Present" />
-            </div>
-            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 5 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151" }}>Description <span style={{ color: "#16a34a" }}>*</span></label>
-                <button onClick={() => handleEnhanceBullet(i)} disabled={enhancing[`exp-${i}`]} style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 12, color: "#16a34a", background: "none", border: "none", cursor: "pointer", opacity: enhancing[`exp-${i}`] ? 0.5 : 1 }}>
-                  {enhancing[`exp-${i}`] ? <><Loader2 size={12} className="animate-spin" /> Enhancing…</> : <><Sparkles size={12} /> AI Enhance</>}
-                </button>
+    try {
+      const response = await axios.post(
+        "/api/resume/build",
+        {
+          personal_info: personalInfo,
+          experiences,
+          educations,
+          skills,
+          target_job_title: target.jobTitle,
+          target_job_description: target.jobDescription,
+        },
+        tokenHeader()
+      );
+
+      setResumeText(response.data.resume_text);
+      setActiveStep(3);
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.detail ||
+          "We could not build your resume right now."
+      );
+    } finally {
+      setLoadingAction("");
+    }
+  };
+
+  const copyResume = async () => {
+    if (!resumeText) return;
+    await navigator.clipboard.writeText(resumeText);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+
+  const downloadResume = () => {
+    if (!resumeText) return;
+
+    const file = new Blob([resumeText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `${personalInfo.full_name || "resume"}-resume.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const nextStep = () => setActiveStep((current) => Math.min(current + 1, 3));
+  const previousStep = () => setActiveStep((current) => Math.max(current - 1, 0));
+
+  return (
+    <main className="builder-page">
+      <Navbar />
+
+      <section className="builder-shell">
+        <div className="container-center">
+          <div className="builder-heading">
+            <div>
+              <div className="builder-eyebrow">
+                <Sparkles size={14} />
+                AI resume builder
               </div>
-              <textarea value={exp.description} onChange={e => setExp(i, "description")(e.target.value)} placeholder="Describe your responsibilities. Click AI Enhance to improve automatically." rows={4} className="textarea" />
+              <h1>Build a resume that feels like you.</h1>
+              <p>
+                Add your experience, polish it with AI, and create a clean
+                ATS-friendly version ready to tailor for your next role.
+              </p>
             </div>
-          </div>
-        ))}
-        <button onClick={() => setExperiences(e => [...e, emptyExperience()])} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#16a34a", background: "none", border: "none", cursor: "pointer" }}>
-          <Plus size={15} /> Add another experience
-        </button>
-      </div>
-    );
 
-    if (step === 2) return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {educations.map((edu, i) => (
-          <div key={i} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, background: "#f8fafc" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13, color: "#374151" }}>Education {i + 1}</span>
-              {educations.length > 1 && <button onClick={() => setEducations(e => e.filter((_, idx) => idx !== i))} style={{ color: "#dc2626", background: "none", border: "none", cursor: "pointer" }}><Trash2 size={15} /></button>}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Field label="Degree"          required value={edu.degree}          onChange={setEdu(i, "degree")}          placeholder="B.Sc. Computer Science" />
-              <Field label="Institution"     required value={edu.institution}     onChange={setEdu(i, "institution")}     placeholder="MIT" />
-              <Field label="Location"                 value={edu.location}         onChange={setEdu(i, "location")}        placeholder="Cambridge, MA" />
-              <Field label="Graduation Year" required value={edu.graduation_year} onChange={setEdu(i, "graduation_year")} placeholder="2024" />
-              <Field label="GPA (optional)"           value={edu.gpa}              onChange={setEdu(i, "gpa")}             placeholder="3.8 / 4.0" />
+            <div className="builder-status">
+              <span>Step {activeStep + 1} of 4</span>
+              <strong>{steps[activeStep].label}</strong>
             </div>
           </div>
-        ))}
-        <button onClick={() => setEducations(e => [...e, emptyEducation()])} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#16a34a", background: "none", border: "none", cursor: "pointer" }}>
-          <Plus size={15} /> Add another education
-        </button>
-      </div>
-    );
 
-    if (step === 3) return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <div>
-          <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>
-            Add skills <span style={{ color: "#16a34a" }}>*</span>
-            <span style={{ fontWeight: 400, color: "#94a3b8", marginLeft: 6 }}>press Enter or comma to add</span>
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={skillInput} onChange={e => setSkillInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addSkill(); } }} placeholder="e.g. Python, React, SQL…" className="input" style={{ flex: 1 }} />
-            <button onClick={addSkill} className="btn-primary" style={{ padding: "10px 18px", flexShrink: 0 }}>Add</button>
-          </div>
-        </div>
-        {skills.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {skills.map(skill => (
-              <span key={skill} style={{ display: "flex", alignItems: "center", gap: 6, background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", padding: "5px 12px", borderRadius: 100, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13 }}>
-                {skill}
-                <button onClick={() => setSkills(s => s.filter(sk => sk !== skill))} style={{ color: "#86efac", background: "none", border: "none", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
-              </span>
-            ))}
-          </div>
-        )}
-        {skills.length === 0 && <p style={{ fontFamily: "'Lato', sans-serif", color: "#94a3b8", fontSize: 13 }}>No skills added yet.</p>}
-        <div>
-          <p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 8 }}>Common suggestions</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {SUGGESTIONS.filter(s => !skills.includes(s)).map(s => (
-              <button key={s} onClick={() => setSkills(sk => [...sk, s])} style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, border: "1px solid #e2e8f0", color: "#64748b", padding: "5px 12px", borderRadius: 100, background: "white", cursor: "pointer", transition: "all 0.15s" }}>
-                + {s}
+          <div className="builder-stepper">
+            {steps.map(({ label, icon: Icon }, index) => (
+              <button
+                key={label}
+                type="button"
+                className={`builder-step ${
+                  index === activeStep ? "is-active" : ""
+                } ${index < activeStep ? "is-complete" : ""}`}
+                onClick={() => setActiveStep(index)}
+              >
+                <span>
+                  {index < activeStep ? <Check size={15} /> : <Icon size={16} />}
+                </span>
+                <strong>{label}</strong>
               </button>
             ))}
           </div>
-        </div>
-      </div>
-    );
 
-    if (step === 4) return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {!builtResume && !building && (
-          <div style={{ textAlign: "center", padding: "48px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-            <div style={{ width: 60, height: 60, background: "#f0fdf4", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FileText size={28} color="#16a34a" />
-            </div>
-            <div>
-              <h3 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 17, color: "#111827" }}>Ready to build your resume?</h3>
-              <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 14, marginTop: 4 }}>Our AI will polish and format everything for you.</p>
-            </div>
-            {buildError && <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 16px", maxWidth: 440 }}><p style={{ fontFamily: "'Lato', sans-serif", color: "#991b1b", fontSize: 13 }}>{buildError}</p></div>}
-            <button onClick={handleBuildResume} className="btn-primary" style={{ padding: "13px 28px", fontSize: 15 }}>
-              <Sparkles size={15} /> Build my resume with AI
-            </button>
-          </div>
-        )}
-        {building && (
-          <div style={{ textAlign: "center", padding: "64px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-            <Loader2 size={36} color="#16a34a" className="animate-spin" />
-            <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 14 }}>AI is polishing your resume…</p>
-          </div>
-        )}
-        {builtResume && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <h3 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15, color: "#111827" }}>Your resume</h3>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handleCopy} className="btn-secondary" style={{ padding: "7px 14px", fontSize: 13 }}>
-                  {copied ? <><Check size={13} color="#16a34a" /> Copied</> : <><Copy size={13} /> Copy</>}
-                </button>
-                <button onClick={handleDownloadPdf} disabled={downloadingPdf} className="btn-primary" style={{ padding: "7px 14px", fontSize: 13 }}>
-                  {downloadingPdf ? <><Loader2 size={13} className="animate-spin" /> Preparing…</> : <><Download size={13} /> Download PDF</>}
-                </button>
-                <button onClick={handleBuildResume} className="btn-secondary" style={{ padding: "7px 14px", fontSize: 13 }}>
-                  <Sparkles size={13} /> Regenerate
-                </button>
-              </div>
-            </div>
-            <pre style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "24px", fontFamily: "'Courier New', monospace", fontSize: 13, color: "#374151", whiteSpace: "pre-wrap", lineHeight: 1.7, overflowY: "auto", maxHeight: "60vh" }}>
-              {builtResume}
-            </pre>
-            <p style={{ fontFamily: "'Lato', sans-serif", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
-              Copy this text into Word or Google Docs to apply final formatting.
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  };
+          <div className="builder-layout">
+            <section className="builder-form-card">
+              {activeStep === 0 && (
+                <div className="builder-step-content">
+                  <div className="builder-section-title">
+                    <div className="builder-section-icon"><UserRound size={19} /></div>
+                    <div>
+                      <span>Start with the essentials</span>
+                      <h2>Your professional profile</h2>
+                    </div>
+                  </div>
 
-  return (
-    <main className="page-shell">
-      <Navbar />
-      <div className="container-center py-10">
+                  <div className="builder-input-grid">
+                    <label className="builder-field builder-field-wide">
+                      <span>Full name</span>
+                      <input
+                        value={personalInfo.full_name}
+                        onChange={(event) =>
+                          updatePersonalInfo("full_name", event.target.value)
+                        }
+                        placeholder="Jane Smith"
+                      />
+                    </label>
 
-        {/* Header */}
-        <div style={{ marginBottom: 28 }}>
-          <span className="section-tag">AI Resume Builder</span>
-          <h1 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: "clamp(1.6rem, 2.5vw, 2rem)", letterSpacing: "-0.025em", color: "#111827" }}>Build your resume</h1>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 14, marginTop: 4 }}>Fill in your details — AI will enhance and format everything.</p>
-        </div>
+                    <label className="builder-field">
+                      <span>Email address</span>
+                      <input
+                        type="email"
+                        value={personalInfo.email}
+                        onChange={(event) =>
+                          updatePersonalInfo("email", event.target.value)
+                        }
+                        placeholder="jane@email.com"
+                      />
+                    </label>
 
-        {/* Step progress */}
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 24, overflowX: "auto", paddingBottom: 4 }}>
-          {STEPS.map((s, i) => {
-            const Icon = s.icon;
-            const active   = i === step;
-            const complete = i < step;
-            return (
-              <div key={s.id} style={{ display: "flex", alignItems: "center" }}>
+                    <label className="builder-field">
+                      <span>Phone number</span>
+                      <input
+                        value={personalInfo.phone}
+                        onChange={(event) =>
+                          updatePersonalInfo("phone", event.target.value)
+                        }
+                        placeholder="+33 6 00 00 00 00"
+                      />
+                    </label>
+
+                    <label className="builder-field">
+                      <span>Location</span>
+                      <input
+                        value={personalInfo.location}
+                        onChange={(event) =>
+                          updatePersonalInfo("location", event.target.value)
+                        }
+                        placeholder="Paris, France"
+                      />
+                    </label>
+
+                    <label className="builder-field">
+                      <span>LinkedIn URL <em>Optional</em></span>
+                      <input
+                        value={personalInfo.linkedin}
+                        onChange={(event) =>
+                          updatePersonalInfo("linkedin", event.target.value)
+                        }
+                        placeholder="linkedin.com/in/janesmith"
+                      />
+                    </label>
+
+                    <label className="builder-field builder-field-wide">
+                      <span>Target job title</span>
+                      <input
+                        value={target.jobTitle}
+                        onChange={(event) =>
+                          updateTarget("jobTitle", event.target.value)
+                        }
+                        placeholder="Product Designer"
+                      />
+                    </label>
+
+                    <label className="builder-field builder-field-wide">
+                      <span>Target job description <em>Optional</em></span>
+                      <textarea
+                        value={target.jobDescription}
+                        onChange={(event) =>
+                          updateTarget("jobDescription", event.target.value)
+                        }
+                        placeholder="Paste a job description to tailor your resume..."
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {activeStep === 1 && (
+                <div className="builder-step-content">
+                  <div className="builder-section-title">
+                    <div className="builder-section-icon"><PenLine size={19} /></div>
+                    <div>
+                      <span>Show the impact you made</span>
+                      <h2>Your work experience</h2>
+                    </div>
+                  </div>
+
+                  <div className="builder-repeat-list">
+                    {experiences.map((experience, index) => (
+                      <article className="builder-repeat-card" key={index}>
+                        <div className="repeat-card-heading">
+                          <span>Experience {String(index + 1).padStart(2, "0")}</span>
+                          {experiences.length > 1 && (
+                            <button
+                              type="button"
+                              className="icon-delete-button"
+                              onClick={() =>
+                                setExperiences((current) =>
+                                  current.filter((_, itemIndex) => itemIndex !== index)
+                                )
+                              }
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="builder-input-grid">
+                          <label className="builder-field">
+                            <span>Job title</span>
+                            <input
+                              value={experience.job_title}
+                              onChange={(event) =>
+                                updateExperience(index, "job_title", event.target.value)
+                              }
+                              placeholder="UX Designer"
+                            />
+                          </label>
+
+                          <label className="builder-field">
+                            <span>Company</span>
+                            <input
+                              value={experience.company}
+                              onChange={(event) =>
+                                updateExperience(index, "company", event.target.value)
+                              }
+                              placeholder="Company name"
+                            />
+                          </label>
+
+                          <label className="builder-field">
+                            <span>Start date</span>
+                            <input
+                              value={experience.start_date}
+                              onChange={(event) =>
+                                updateExperience(index, "start_date", event.target.value)
+                              }
+                              placeholder="Jan 2022"
+                            />
+                          </label>
+
+                          <label className="builder-field">
+                            <span>End date</span>
+                            <input
+                              value={experience.end_date}
+                              onChange={(event) =>
+                                updateExperience(index, "end_date", event.target.value)
+                              }
+                              placeholder="Present"
+                            />
+                          </label>
+
+                          <label className="builder-field builder-field-wide">
+                            <span>What did you achieve?</span>
+                            <textarea
+                              value={experience.description}
+                              onChange={(event) =>
+                                updateExperience(index, "description", event.target.value)
+                              }
+                              placeholder="Describe your responsibilities, successes, and measurable impact..."
+                            />
+                          </label>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="ai-enhance-button"
+                          onClick={() => enhanceBullet(index)}
+                          disabled={loadingAction === `enhance-${index}`}
+                        >
+                          {loadingAction === `enhance-${index}` ? (
+                            <Loader2 size={15} className="animate-spin" />
+                          ) : (
+                            <WandSparkles size={15} />
+                          )}
+                          AI Enhance this description
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="add-repeat-button"
+                    onClick={() =>
+                      setExperiences((current) => [...current, emptyExperience()])
+                    }
+                  >
+                    <Plus size={17} /> Add another experience
+                  </button>
+                </div>
+              )}
+
+              {activeStep === 2 && (
+                <div className="builder-step-content">
+                  <div className="builder-section-title">
+                    <div className="builder-section-icon"><GraduationCap size={19} /></div>
+                    <div>
+                      <span>Complete your background</span>
+                      <h2>Education and skills</h2>
+                    </div>
+                  </div>
+
+                  <div className="builder-repeat-list">
+                    {educations.map((education, index) => (
+                      <article className="builder-repeat-card" key={index}>
+                        <div className="repeat-card-heading">
+                          <span>Education {String(index + 1).padStart(2, "0")}</span>
+                          {educations.length > 1 && (
+                            <button
+                              type="button"
+                              className="icon-delete-button"
+                              onClick={() =>
+                                setEducations((current) =>
+                                  current.filter((_, itemIndex) => itemIndex !== index)
+                                )
+                              }
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="builder-input-grid">
+                          <label className="builder-field">
+                            <span>Degree</span>
+                            <input
+                              value={education.degree}
+                              onChange={(event) =>
+                                updateEducation(index, "degree", event.target.value)
+                              }
+                              placeholder="Bachelor of Design"
+                            />
+                          </label>
+
+                          <label className="builder-field">
+                            <span>Institution</span>
+                            <input
+                              value={education.institution}
+                              onChange={(event) =>
+                                updateEducation(index, "institution", event.target.value)
+                              }
+                              placeholder="University name"
+                            />
+                          </label>
+
+                          <label className="builder-field">
+                            <span>Graduation year</span>
+                            <input
+                              value={education.graduation_year}
+                              onChange={(event) =>
+                                updateEducation(index, "graduation_year", event.target.value)
+                              }
+                              placeholder="2024"
+                            />
+                          </label>
+
+                          <label className="builder-field">
+                            <span>GPA <em>Optional</em></span>
+                            <input
+                              value={education.gpa}
+                              onChange={(event) =>
+                                updateEducation(index, "gpa", event.target.value)
+                              }
+                              placeholder="3.8 / 4.0"
+                            />
+                          </label>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="add-repeat-button"
+                    onClick={() =>
+                      setEducations((current) => [...current, emptyEducation()])
+                    }
+                  >
+                    <Plus size={17} /> Add another education
+                  </button>
+
+                  <div className="skills-input-section">
+                    <label className="builder-field">
+                      <span>Skills</span>
+                      <input
+                        value={skillsInput}
+                        onChange={(event) => setSkillsInput(event.target.value)}
+                        placeholder="Figma, React, Project Management, SQL..."
+                      />
+                    </label>
+
+                    <p>Separate each skill with a comma.</p>
+
+                    {skills.length > 0 && (
+                      <div className="builder-skill-chips">
+                        {skills.map((skill) => (
+                          <span key={skill}>{skill}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeStep === 3 && (
+                <div className="builder-step-content">
+                  <div className="builder-section-title">
+                    <div className="builder-section-icon"><FileText size={19} /></div>
+                    <div>
+                      <span>Review and create</span>
+                      <h2>Your resume draft</h2>
+                    </div>
+                  </div>
+
+                  {!resumeText ? (
+                    <div className="builder-empty-preview">
+                      <FileText size={31} />
+                      <h3>Ready to create your resume?</h3>
+                      <p>
+                        We will format your information into a polished,
+                        ATS-friendly resume.
+                      </p>
+                      <button
+                        type="button"
+                        className="builder-create-button"
+                        onClick={buildResume}
+                        disabled={loadingAction === "build"}
+                      >
+                        {loadingAction === "build" ? (
+                          <Loader2 size={17} className="animate-spin" />
+                        ) : (
+                          <Sparkles size={17} />
+                        )}
+                        Build my resume
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="generated-resume">
+                      <div className="generated-resume-actions">
+                        <span>AI-generated resume</span>
+                        <div>
+                          <button type="button" onClick={copyResume}>
+                            {copied ? <Check size={15} /> : <Copy size={15} />}
+                            {copied ? "Copied" : "Copy"}
+                          </button>
+                          <button type="button" onClick={downloadResume}>
+                            <Download size={15} /> Download
+                          </button>
+                        </div>
+                      </div>
+
+                      <pre>{resumeText}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {error && <div className="builder-error">{error}</div>}
+
+              <div className="builder-navigation">
                 <button
-                  onClick={() => i < step && setStep(i)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "8px 14px", borderRadius: 8, border: "none",
-                    fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13,
-                    cursor: complete ? "pointer" : "default",
-                    background: active ? "#16a34a" : "transparent",
-                    color: active ? "white" : complete ? "#16a34a" : "#94a3b8",
-                    transition: "all 0.15s", whiteSpace: "nowrap",
-                    boxShadow: active ? "0 4px 14px rgba(22,163,74,0.25)" : "none",
-                  }}
+                  type="button"
+                  className="builder-back-button"
+                  onClick={previousStep}
+                  disabled={activeStep === 0}
                 >
-                  <Icon size={14} /> {s.label}
+                  <ArrowLeft size={16} /> Back
                 </button>
-                {i < STEPS.length - 1 && <ChevronRight size={14} color={i < step ? "#16a34a" : "#e2e8f0"} style={{ flexShrink: 0, margin: "0 2px" }} />}
+
+                {activeStep < 3 ? (
+                  <button type="button" className="builder-next-button" onClick={nextStep}>
+                    Continue <ArrowRight size={16} />
+                  </button>
+                ) : (
+                  <button type="button" className="builder-next-button" onClick={buildResume}>
+                    {loadingAction === "build" ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={16} />
+                    )}
+                    Build resume
+                  </button>
+                )}
               </div>
-            );
-          })}
-        </div>
+            </section>
 
-        {/* Card */}
-        <div className="card" style={{ padding: "28px 32px", marginBottom: 20 }}>
-          <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 20 }}>{STEPS[step].label}</h2>
-          {renderStep()}
-        </div>
+            <aside className="builder-preview-panel">
+              <div className="builder-preview-top">
+                <span>Live preview</span>
+                <ChevronDown size={16} />
+              </div>
 
-        {/* Nav buttons */}
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <button onClick={() => setStep(s => s - 1)} disabled={step === 0} className="btn-secondary" style={{ opacity: step === 0 ? 0.3 : 1, cursor: step === 0 ? "not-allowed" : "pointer" }}>
-            <ChevronLeft size={15} /> Back
-          </button>
-          {step < STEPS.length - 1 ? (
-            <button onClick={() => setStep(s => s + 1)} disabled={!canNext()} className="btn-primary" style={{ opacity: !canNext() ? 0.4 : 1, cursor: !canNext() ? "not-allowed" : "pointer" }}>
-              Next <ChevronRight size={15} />
-            </button>
-          ) : (
-            <Link href="/analyze" className="btn-secondary">Go analyze a job <ChevronRight size={15} /></Link>
-          )}
+              <div className="resume-paper-preview">
+                <h2>{personalInfo.full_name || "Your name"}</h2>
+                <p className="preview-role">{target.jobTitle || "Your target role"}</p>
+
+                <div className="preview-contact">
+                  {[personalInfo.email, personalInfo.phone, personalInfo.location]
+                    .filter(Boolean)
+                    .map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                </div>
+
+                <div className="preview-rule" />
+
+                <section>
+                  <h3>Profile</h3>
+                  <p>
+                    {personalInfo.summary ||
+                      "Your professional summary will appear here. Use AI Generate Summary to create one based on your background."}
+                  </p>
+                </section>
+
+                <section>
+                  <h3>Experience</h3>
+                  {experiences
+                    .filter((experience) => experience.job_title || experience.company)
+                    .map((experience, index) => (
+                      <div className="preview-entry" key={index}>
+                        <strong>{experience.job_title || "Job title"}</strong>
+                        <span>
+                          {experience.company || "Company"}
+                          {experience.start_date && ` · ${experience.start_date}`}
+                          {experience.end_date && ` – ${experience.end_date}`}
+                        </span>
+                        <p>{experience.description || "Your achievements will appear here."}</p>
+                      </div>
+                    ))}
+                </section>
+
+                <section>
+                  <h3>Skills</h3>
+                  <div className="preview-skills">
+                    {skills.length
+                      ? skills.slice(0, 8).map((skill) => <span key={skill}>{skill}</span>)
+                      : <p>Add skills to preview them here.</p>}
+                  </div>
+                </section>
+              </div>
+
+              <button
+                type="button"
+                className="generate-summary-button"
+                onClick={generateSummary}
+                disabled={loadingAction === "summary"}
+              >
+                {loadingAction === "summary" ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <WandSparkles size={16} />
+                )}
+                Generate AI summary
+              </button>
+            </aside>
+          </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }
