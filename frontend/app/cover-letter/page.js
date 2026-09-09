@@ -1,224 +1,273 @@
 "use client";
-import { useState } from "react";
+
+import { useRef, useState } from "react";
 import axios from "axios";
-import Link from "next/link";
 import Navbar from "../Navbar";
-import { Upload, Briefcase, Building2, FileText, ArrowRight, Loader2, AlertCircle, Copy, Check, Download } from "lucide-react";
+import {
+  AlertCircle,
+  BriefcaseBusiness,
+  Check,
+  Copy,
+  Download,
+  FileText,
+  Loader2,
+  Mail,
+  Sparkles,
+  UploadCloud,
+  WandSparkles,
+  X,
+} from "lucide-react";
 
 export default function CoverLetter() {
-  const [file, setFile]               = useState(null);
-  const [dragOver, setDragOver]       = useState(false);
-  const [jobTitle, setJobTitle]       = useState("");
+  const fileInput = useRef(null);
+  const [file, setFile] = useState(null);
+  const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [jobDescription, setJobDescription] = useState("");
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState(null);
-  const [result, setResult]           = useState(null);
-  const [copied, setCopied]           = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const handleDrop = (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setFile(f); };
+  const selectFile = (selectedFile) => {
+    if (!selectedFile) return;
 
-  const handleGenerate = async () => {
-    if (!file || !jobTitle || !companyName || !jobDescription.trim()) {
-      setError("Please fill in all fields and upload your resume."); return;
+    if (!/\.(pdf|docx)$/i.test(selectedFile.name)) {
+      setError("Please upload a PDF or DOCX resume.");
+      return;
     }
-    setError(null); setLoading(true); setResult(null);
+
+    setFile(selectedFile);
+    setError("");
+  };
+
+  const generateLetter = async () => {
+    if (!file || !jobTitle.trim() || !companyName.trim() || !jobDescription.trim()) {
+      setError("Add your resume, job title, company name, and job description.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
     try {
-      const token = localStorage.getItem("token");
       const formData = new FormData();
       formData.append("file", file);
       formData.append("job_title", jobTitle);
       formData.append("company_name", companyName);
       formData.append("job_description", jobDescription);
-      const res = await axios.post("/api/cover-letter", formData, {
-        headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${token}` }
+
+      const response = await axios.post("/api/cover-letter", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       });
-      setResult(res.data);
-    } catch (err) { setError(err.response?.data?.detail || "Something went wrong. Try again."); }
-    finally { setLoading(false); }
-  };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(result.cover_letter);
-    setCopied(true); setTimeout(() => setCopied(false), 2000);
-  };
-
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
-
-  const loadJsPdf = () => new Promise((resolve, reject) => {
-    if (window.jspdf) return resolve(window.jspdf);
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-    script.onload = () => resolve(window.jspdf);
-    script.onerror = reject;
-    document.body.appendChild(script);
-  });
-
-  const handleDownload = async () => {
-    setDownloadingPdf(true);
-    try {
-      const { jsPDF } = await loadJsPdf();
-      const doc = new jsPDF({ unit: "pt", format: "letter" });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 64;
-      const maxWidth = pageWidth - margin * 2;
-      let y = 80;
-
-      doc.setFont("times", "normal");
-      doc.setFontSize(11.5);
-      doc.setTextColor(17, 24, 39);
-
-      const paragraphs = result.cover_letter.split("\n");
-      for (const para of paragraphs) {
-        if (para.trim() === "") { y += 14; continue; }
-        const wrapped = doc.splitTextToSize(para, maxWidth);
-        for (const line of wrapped) {
-          if (y > 740) { doc.addPage(); y = 80; }
-          doc.text(line, margin, y);
-          y += 16;
-        }
-        y += 6;
-      }
-
-      const safeCompany = (result.company_name || "company").trim().replace(/\s+/g, "_");
-      doc.save(`cover_letter_${safeCompany}.pdf`);
-    } catch (e) {
-      // fallback to txt if PDF generation fails
-      const blob = new Blob([result.cover_letter], { type: "text/plain" });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
-      a.href = url; a.download = `cover_letter_${result.company_name}.txt`; a.click();
-      URL.revokeObjectURL(url);
+      setCoverLetter(response.data.cover_letter);
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.detail ||
+          "We could not generate your cover letter. Please try again."
+      );
     } finally {
-      setDownloadingPdf(false);
+      setLoading(false);
     }
   };
 
+  const copyLetter = async () => {
+    await navigator.clipboard.writeText(coverLetter);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+
+  const downloadLetter = () => {
+    const blob = new Blob([coverLetter], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${companyName || "cover-letter"}-cover-letter.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <main className="page-shell">
+    <main className="letter-page">
       <Navbar />
-      <div className="container-center py-10">
 
-        {/* Header */}
-        <div style={{ marginBottom: 32 }}>
-          <span className="section-tag">AI-Powered</span>
-          <h1 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: "clamp(1.6rem, 2.5vw, 2rem)", letterSpacing: "-0.025em", color: "#111827" }}>
-            Cover letter generator
-          </h1>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 14, marginTop: 4 }}>
-            Upload your resume, add the job details — get a personalized cover letter in seconds.
-          </p>
-        </div>
+      <section className="letter-shell">
+        <div className="container-center">
+          <header className="letter-header">
+            <div className="letter-eyebrow"><Sparkles size={14} /> AI cover letter</div>
+            <h1>Write a letter worth reading.</h1>
+            <p>
+              Give us your resume and the role. ResumeAI will create a tailored,
+              professional first draft you can make your own.
+            </p>
+          </header>
 
-        {!result ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Upload */}
-            <div className="card" style={{ padding: 24 }}>
-              <div className="flex items-center gap-2 mb-4">
-                <div style={{ width: 28, height: 28, background: "#f0fdf4", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <FileText size={14} color="#16a34a" />
+          <div className="letter-layout">
+            <section className="letter-form-panel">
+              <div className="letter-section-heading">
+                <div><FileText size={18} /></div>
+                <div>
+                  <span>Step 01</span>
+                  <h2>Your resume</h2>
                 </div>
-                <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 14, color: "#111827" }}>Upload your resume</h2>
               </div>
+
               <div
-                className={`upload-zone ${dragOver ? "drag-over" : ""}`}
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                className={`letter-upload ${dragOver ? "is-dragging" : ""} ${file ? "has-file" : ""}`}
+                onClick={() => fileInput.current?.click()}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragOver(true);
+                }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => document.getElementById("clFile").click()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragOver(false);
+                  selectFile(event.dataTransfer.files?.[0]);
+                }}
               >
-                <Upload size={24} color={file ? "#16a34a" : "#94a3b8"} style={{ margin: "0 auto 10px" }} />
-                {file
-                  ? <p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#16a34a" }}>{file.name}</p>
-                  : <><p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#374151" }}>Drag & drop or click to upload</p><p style={{ fontFamily: "'Lato', sans-serif", fontSize: 12, color: "#94a3b8", marginTop: 4 }}>PDF or DOCX</p></>}
-                <input id="clFile" type="file" accept=".pdf,.docx" onChange={e => { const f = e.target.files[0]; if (f) setFile(f); }} className="hidden" />
-              </div>
-            </div>
+                <input
+                  ref={fileInput}
+                  className="sr-only"
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={(event) => selectFile(event.target.files?.[0])}
+                />
 
-            {/* Job details */}
-            <div className="card" style={{ padding: 24 }}>
-              <div className="flex items-center gap-2 mb-4">
-                <div style={{ width: 28, height: 28, background: "#f0fdf4", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Briefcase size={14} color="#16a34a" />
-                </div>
-                <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 14, color: "#111827" }}>Job details</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>Job title</label>
-                  <div style={{ position: "relative" }}>
-                    <Briefcase size={14} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-                    <input type="text" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="e.g. Frontend Developer" className="input" style={{ paddingLeft: 34 }} />
+                {file ? (
+                  <div className="letter-file-selected">
+                    <div><FileText size={20} /></div>
+                    <strong>{file.name}</strong>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setFile(null);
+                      }}
+                      aria-label="Remove uploaded resume"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="letter-upload-icon"><UploadCloud size={25} /></div>
+                    <strong>Upload your resume</strong>
+                    <span>PDF or DOCX · Click or drag it here</span>
+                  </>
+                )}
+              </div>
+
+              <div className="letter-section-heading letter-details-heading">
+                <div><BriefcaseBusiness size={18} /></div>
                 <div>
-                  <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>Company name</label>
-                  <div style={{ position: "relative" }}>
-                    <Building2 size={14} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-                    <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="e.g. Google" className="input" style={{ paddingLeft: 34 }} />
-                  </div>
+                  <span>Step 02</span>
+                  <h2>Tell us about the role</h2>
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>Job description</label>
-                <textarea value={jobDescription} onChange={e => setJobDescription(e.target.value)} placeholder="Paste the full job description here…" className="textarea" rows={6} />
-              </div>
-            </div>
+              <div className="letter-input-grid">
+                <label>
+                  <span>Job title</span>
+                  <input
+                    value={jobTitle}
+                    onChange={(event) => setJobTitle(event.target.value)}
+                    placeholder="e.g. Frontend Developer"
+                  />
+                </label>
 
-            {error && (
-              <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                <AlertCircle size={15} color="#991b1b" />
-                <p style={{ fontFamily: "'Lato', sans-serif", color: "#991b1b", fontSize: 13 }}>{error}</p>
-              </div>
-            )}
+                <label>
+                  <span>Company name</span>
+                  <input
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                    placeholder="e.g. Acme Studio"
+                  />
+                </label>
 
-            <div style={{ textAlign: "center" }}>
-              <button onClick={handleGenerate} disabled={loading} className="btn-primary" style={{ padding: "13px 36px", fontSize: 15 }}>
-                {loading ? <><Loader2 size={15} className="animate-spin" /> Generating…</> : <>Generate cover letter <ArrowRight size={15} /></>}
+                <label className="letter-full-width">
+                  <span>Job description</span>
+                  <textarea
+                    value={jobDescription}
+                    onChange={(event) => setJobDescription(event.target.value)}
+                    placeholder="Paste the complete job description here..."
+                  />
+                  <small>
+                    {jobDescription.trim().split(/\s+/).filter(Boolean).length} words
+                  </small>
+                </label>
+              </div>
+
+              {error && (
+                <div className="letter-error">
+                  <AlertCircle size={17} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="letter-generate-button"
+                disabled={loading}
+                onClick={generateLetter}
+              >
+                {loading ? (
+                  <><Loader2 size={17} className="animate-spin" /> Writing your letter…</>
+                ) : (
+                  <><WandSparkles size={17} /> Generate cover letter</>
+                )}
               </button>
-            </div>
+            </section>
+
+            <aside className="letter-preview-panel">
+              <div className="letter-preview-top">
+                <div>
+                  <span>Live output</span>
+                  <h2>Cover letter preview</h2>
+                </div>
+                <Mail size={19} />
+              </div>
+
+              {!coverLetter ? (
+                <div className="letter-empty-preview">
+                  <div><Mail size={31} /></div>
+                  <h3>Your tailored letter will appear here.</h3>
+                  <p>
+                    It will use your resume, the job requirements, and company
+                    name to create a strong, relevant starting point.
+                  </p>
+                  <ul>
+                    <li>Professional and personal tone</li>
+                    <li>Relevant experience highlighted</li>
+                    <li>Clear call to action</li>
+                  </ul>
+                </div>
+              ) : (
+                <div className="letter-generated">
+                  <div className="letter-actions">
+                    <span>Generated draft</span>
+                    <div>
+                      <button type="button" onClick={copyLetter}>
+                        {copied ? <Check size={15} /> : <Copy size={15} />}
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                      <button type="button" onClick={downloadLetter}>
+                        <Download size={15} /> Download
+                      </button>
+                    </div>
+                  </div>
+                  <pre>{coverLetter}</pre>
+                </div>
+              )}
+            </aside>
           </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Result header */}
-            <div className="card" style={{ padding: "18px 24px", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div>
-                <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 16, color: "#111827" }}>Your cover letter</h2>
-                <p style={{ fontFamily: "'Lato', sans-serif", fontSize: 13, color: "#64748b", marginTop: 2 }}>
-                  {result.job_title} at {result.company_name}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={handleCopy} className="btn-secondary" style={{ padding: "8px 16px", fontSize: 13 }}>
-                  {copied ? <><Check size={13} color="#16a34a" /> Copied</> : <><Copy size={13} /> Copy</>}
-                </button>
-                <button onClick={handleDownload} disabled={downloadingPdf} className="btn-primary" style={{ padding: "8px 16px", fontSize: 13 }}>
-                  {downloadingPdf ? <><Loader2 size={13} className="animate-spin" /> Preparing…</> : <><Download size={13} /> Download PDF</>}
-                </button>
-              </div>
-            </div>
-
-            {/* Letter */}
-            <div className="card" style={{ padding: 32 }}>
-              <div style={{ background: "white", borderRadius: 10, border: "1px solid #e2e8f0", padding: "36px 40px" }}>
-                <pre style={{ fontFamily: "'Lato', sans-serif", fontSize: 14, color: "#111827", whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
-                  {result.cover_letter}
-                </pre>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3 justify-center">
-              <button onClick={() => setResult(null)} className="btn-primary">Generate another</button>
-              <Link href="/analyze" className="btn-secondary">Analyze resume</Link>
-              <Link href="/dashboard" className="btn-secondary">Dashboard</Link>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      </section>
     </main>
   );
 }

@@ -1,112 +1,136 @@
 ﻿"use client";
+
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { loginUser, saveToken } from "../lib/auth";
-import { FileText, Mail, Lock, ArrowRight } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  FileText,
+  LockKeyhole,
+  Mail,
+  Sparkles,
+} from "lucide-react";
 
 export default function Login() {
   const router = useRouter();
-  const [email, setEmail]     = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
+  const [error, setError] = useState("");
 
-  const handleLogin = async () => {
-    if (!email || !password) { setError("Please fill in all fields."); return; }
-    setLoading(true); setError(null);
+  const submit = async (event) => {
+    event.preventDefault();
+
+    if (!email.trim() || !password) {
+      setError("Enter your email address and password.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
     try {
       const data = await loginUser(email, password);
       saveToken(data.access_token, data.name, data.email);
       router.push("/dashboard");
-    } catch (err) {
-      setError(err.response?.data?.detail || "Login failed. Please try again.");
-    } finally { setLoading(false); }
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.detail ||
+          "We could not sign you in. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleKey = (e) => { if (e.key === "Enter") handleLogin(); };
-
   return (
-    <main className="min-h-screen flex items-center justify-center px-4" style={{ background: "#f8fafc" }}>
-      <div style={{ width: "100%", maxWidth: 420 }}>
+    <main className="auth-page">
+      <section className="auth-showcase">
+        <Link href="/" className="auth-brand">
+          <div><FileText size={17} /></div>
+          <strong>ResumeAI</strong>
+        </Link>
 
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 justify-center mb-6">
-            <div className="logo-mark">
-              <FileText size={16} color="white" strokeWidth={2.5} />
-            </div>
-            <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 20, color: "#111827", letterSpacing: "-0.02em" }}>ResumeAI</span>
-          </Link>
-          <h1 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 26, color: "#111827", letterSpacing: "-0.025em", marginBottom: 6 }}>Welcome back</h1>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 14 }}>Sign in to access your analysis history</p>
+        <div className="auth-showcase-copy">
+          <div className="auth-eyebrow"><Sparkles size={14} /> Apply with confidence</div>
+          <h1>Your next opportunity starts with a stronger story.</h1>
+          <p>
+            Improve every application with resume feedback built around the role
+            you actually want.
+          </p>
+
+          <div className="auth-benefits">
+            <p><CheckCircle2 size={17} /> Tailor resumes to any job description</p>
+            <p><CheckCircle2 size={17} /> Find missing skills and keywords</p>
+            <p><CheckCircle2 size={17} /> Create letters that feel personal</p>
+          </div>
         </div>
 
-        <div className="auth-card">
-          {/* Email */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>
-              Email address
+        <div className="auth-photo-credit" />
+      </section>
+
+      <section className="auth-form-side">
+        <div className="auth-form-wrap">
+          <Link href="/" className="auth-mobile-brand">
+            <div><FileText size={17} /></div>
+            <strong>ResumeAI</strong>
+          </Link>
+
+          <div className="auth-form-heading">
+            <span>Welcome back</span>
+            <h2>Sign in to ResumeAI</h2>
+            <p>Continue building stronger applications.</p>
+          </div>
+
+          <form onSubmit={submit} className="auth-form">
+            <label>
+              <span>Email address</span>
+              <div className="auth-input-wrap">
+                <Mail size={16} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+              </div>
             </label>
-            <div style={{ position: "relative" }}>
-              <Mail size={15} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="you@example.com"
-                className="input"
-                style={{ paddingLeft: 36 }}
-              />
-            </div>
-          </div>
 
-          {/* Password */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#374151", display: "block", marginBottom: 6 }}>
-              Password
+            <label>
+              <span>Password</span>
+              <div className="auth-input-wrap">
+                <LockKeyhole size={16} />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Your password"
+                  autoComplete="current-password"
+                />
+              </div>
             </label>
-            <div style={{ position: "relative" }}>
-              <Lock size={15} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="••••••••"
-                className="input"
-                style={{ paddingLeft: 36 }}
-              />
-            </div>
-          </div>
 
-          {error && (
-            <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
-              <p style={{ fontFamily: "'Lato', sans-serif", color: "#991b1b", fontSize: 13, textAlign: "center" }}>{error}</p>
-            </div>
-          )}
+            {error && (
+              <div className="auth-error">
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
 
-          <button onClick={handleLogin} disabled={loading} className="btn-primary" style={{ width: "100%", justifyContent: "center", padding: "12px", fontSize: 15 }}>
-            {loading ? "Signing in…" : <><span>Sign in</span> <ArrowRight size={15} /></>}
-          </button>
+            <button className="auth-submit-button" disabled={loading}>
+              {loading ? "Signing in…" : <>Sign in <ArrowRight size={17} /></>}
+            </button>
+          </form>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0" }}>
-            <div className="divider" style={{ flex: 1, margin: 0 }} />
-            <span style={{ fontFamily: "'Lato', sans-serif", color: "#94a3b8", fontSize: 12 }}>or</span>
-            <div className="divider" style={{ flex: 1, margin: 0 }} />
-          </div>
-
-          <p style={{ fontFamily: "'Lato', sans-serif", fontSize: 13, color: "#64748b", textAlign: "center" }}>
-            No account?{" "}
-            <Link href="/register" style={{ color: "#16a34a", fontWeight: 700, textDecoration: "none" }}>Create one free</Link>
+          <p className="auth-switch">
+            New to ResumeAI? <Link href="/register">Create a free account</Link>
           </p>
         </div>
-
-        <p style={{ fontFamily: "'Lato', sans-serif", textAlign: "center", marginTop: 20, fontSize: 13 }}>
-          <Link href="/" style={{ color: "#94a3b8", textDecoration: "none" }}>← Back to home</Link>
-        </p>
-      </div>
+      </section>
     </main>
   );
 }

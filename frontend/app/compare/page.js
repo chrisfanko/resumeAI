@@ -1,185 +1,384 @@
 "use client";
-import { useState } from "react";
+
+import { useRef, useState } from "react";
 import axios from "axios";
 import Link from "next/link";
 import Navbar from "../Navbar";
-import { Upload, Plus, Trash2, ArrowRight, Loader2, AlertCircle, Trophy, CheckCircle, XCircle } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Plus,
+  Sparkles,
+  Target,
+  Trash2,
+  Trophy,
+  UploadCloud,
+  X,
+  XCircle,
+} from "lucide-react";
 
-function ScorePill({ score }) {
-  const cls = score >= 70 ? "score-green" : score >= 40 ? "score-yellow" : "score-red";
-  return <span className={cls} style={{ padding: "3px 10px", borderRadius: 100, fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 12 }}>{score}%</span>;
-}
+const newJob = () => ({ title: "", description: "" });
 
-function RecoBadge({ rec }) {
-  const map = {
-    "Strong Match":   { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
-    "Moderate Match": { bg: "#fef9c3", color: "#854d0e", border: "#fef08a" },
-    "Weak Match":     { bg: "#fee2e2", color: "#991b1b", border: "#fecaca" },
-  };
-  const s = map[rec] || map["Weak Match"];
-  return <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, padding: "3px 10px", borderRadius: 100, fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 11 }}>{rec}</span>;
+function scoreTone(score) {
+  if (score >= 70) return "green";
+  if (score >= 40) return "amber";
+  return "red";
 }
 
 export default function Compare() {
-  const [file, setFile]       = useState(null);
+  const fileInput = useRef(null);
+  const [file, setFile] = useState(null);
+  const [jobs, setJobs] = useState([newJob(), newJob()]);
   const [dragOver, setDragOver] = useState(false);
-  const [jobs, setJobs]       = useState([{ title: "", description: "" }, { title: "", description: "" }]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
   const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleDrop = (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setFile(f); };
-  const updateJob  = (i, field, val) => { const j = [...jobs]; j[i][field] = val; setJobs(j); };
-  const addJob     = () => { if (jobs.length < 3) setJobs([...jobs, { title: "", description: "" }]); };
-  const removeJob  = (i) => { if (jobs.length > 2) setJobs(jobs.filter((_, idx) => idx !== i)); };
+  const setJob = (index, field, value) => {
+    setJobs((current) =>
+      current.map((job, jobIndex) =>
+        jobIndex === index ? { ...job, [field]: value } : job
+      )
+    );
+  };
 
-  const handleCompare = async () => {
-    if (!file) { setError("Please upload your resume."); return; }
-    if (jobs.filter(j => j.description.trim()).length < 2) { setError("Please fill in at least 2 job descriptions."); return; }
-    setError(null); setLoading(true); setResults(null);
+  const selectFile = (selectedFile) => {
+    if (!selectedFile) return;
+
+    if (!/\.(pdf|docx)$/i.test(selectedFile.name)) {
+      setError("Please upload a PDF or DOCX resume.");
+      return;
+    }
+
+    setFile(selectedFile);
+    setError("");
+  };
+
+  const compareJobs = async () => {
+    const validJobs = jobs.filter((job) => job.description.trim());
+
+    if (!file) {
+      setError("Upload your resume before comparing jobs.");
+      return;
+    }
+
+    if (validJobs.length < 2) {
+      setError("Add at least two complete job descriptions.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
     try {
-      const token = localStorage.getItem("token");
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("job_descriptions", JSON.stringify(jobs));
-      const res = await axios.post("/api/compare", formData, { headers: { "Content-Type": "multipart/form-data", Authorization: `Bearer ${token}` } });
-      setResults(res.data);
-    } catch (err) { setError(err.response?.data?.detail || "Something went wrong."); }
-    finally { setLoading(false); }
+      formData.append("job_descriptions", JSON.stringify(validJobs));
+
+      const response = await axios.post("/api/compare", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      setResults(response.data);
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.detail ||
+          "We could not compare these jobs. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <main className="page-shell">
+    <main className="compare-page">
       <Navbar />
-      <div className="container-center py-10">
 
-        <div style={{ marginBottom: 32 }}>
-          <span className="section-tag">Job Comparison</span>
-          <h1 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: "clamp(1.6rem, 2.5vw, 2rem)", letterSpacing: "-0.025em", color: "#111827" }}>Compare jobs</h1>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 14, marginTop: 4 }}>See which job is your best match — side by side.</p>
-        </div>
-
-        {!results ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Upload */}
-            <div className="card" style={{ padding: 24 }}>
-              <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 14 }}>Upload your resume</h2>
-              <div className={`upload-zone ${dragOver ? "drag-over" : ""}`}
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => document.getElementById("cmpFile").click()}
-              >
-                <Upload size={24} color={file ? "#16a34a" : "#94a3b8"} style={{ margin: "0 auto 10px" }} />
-                {file
-                  ? <p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#16a34a" }}>{file.name}</p>
-                  : <><p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#374151" }}>Drag & drop or click to upload</p><p style={{ fontFamily: "'Lato', sans-serif", fontSize: 12, color: "#94a3b8", marginTop: 4 }}>PDF or DOCX</p></>}
-                <input id="cmpFile" type="file" accept=".pdf,.docx" onChange={e => { const f = e.target.files[0]; if (f) setFile(f); }} className="hidden" />
+      <section className="compare-shell">
+        <div className="container-center">
+          <header className="compare-header">
+            <div>
+              <div className="compare-eyebrow">
+                <Sparkles size={14} />
+                Job comparison
               </div>
+              <h1>Find the role that fits you best.</h1>
+              <p>
+                Compare your resume with two or three job descriptions and
+                focus your energy on the strongest opportunity.
+              </p>
             </div>
 
-            {/* Jobs */}
-            <div className="card" style={{ padding: 24 }}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 14, color: "#111827" }}>Job descriptions</h2>
-                {jobs.length < 3 && (
-                  <button onClick={addJob} className="btn-secondary" style={{ padding: "7px 14px", fontSize: 13 }}>
-                    <Plus size={14} /> Add job
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {jobs.map((job, i) => (
-                  <div key={i} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 12, color: "#16a34a", textTransform: "uppercase", letterSpacing: "0.05em" }}>Job {i + 1}</span>
-                      {jobs.length > 2 && <button onClick={() => removeJob(i)} style={{ color: "#dc2626", cursor: "pointer", background: "none", border: "none" }}><Trash2 size={14} /></button>}
-                    </div>
-                    <input type="text" value={job.title} onChange={e => updateJob(i, "title", e.target.value)} placeholder="Job title" className="input" style={{ marginBottom: 10 }} />
-                    <textarea value={job.description} onChange={e => updateJob(i, "description", e.target.value)} placeholder="Paste job description…" className="textarea" rows={8} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {error && (
-              <div style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
-                <AlertCircle size={15} color="#991b1b" />
-                <p style={{ fontFamily: "'Lato', sans-serif", color: "#991b1b", fontSize: 13 }}>{error}</p>
+            {!results && (
+              <div className="compare-header-note">
+                <Target size={18} />
+                <span>Compare up to 3 jobs</span>
               </div>
             )}
+          </header>
 
-            <div style={{ textAlign: "center" }}>
-              <button onClick={handleCompare} disabled={loading} className="btn-primary" style={{ padding: "13px 36px", fontSize: 15 }}>
-                {loading ? <><Loader2 size={15} className="animate-spin" /> Comparing…</> : <>Compare jobs <ArrowRight size={15} /></>}
-              </button>
+          {!results ? (
+            <div className="compare-form-layout">
+              <aside className="compare-sidebar">
+                <div className="compare-step-label">Step 01</div>
+                <h2>Add your resume once.</h2>
+                <p>We will compare the same resume against every role.</p>
+
+                <div
+                  className={`compare-upload ${dragOver ? "is-dragging" : ""} ${
+                    file ? "has-file" : ""
+                  }`}
+                  onClick={() => fileInput.current?.click()}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragOver(false);
+                    selectFile(event.dataTransfer.files?.[0]);
+                  }}
+                >
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept=".pdf,.docx"
+                    className="sr-only"
+                    onChange={(event) => selectFile(event.target.files?.[0])}
+                  />
+
+                  {file ? (
+                    <div className="compare-file-selected">
+                      <div><FileText size={20} /></div>
+                      <span>{file.name}</span>
+                      <button
+                        type="button"
+                        aria-label="Remove resume"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setFile(null);
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="compare-upload-icon"><UploadCloud size={24} /></div>
+                      <strong>Upload resume</strong>
+                      <span>PDF or DOCX</span>
+                    </>
+                  )}
+                </div>
+
+                <div className="compare-side-tip">
+                  <CheckCircle2 size={16} />
+                  <p>Use full job descriptions for the most useful skill comparison.</p>
+                </div>
+              </aside>
+
+              <section className="compare-jobs-panel">
+                <div className="compare-panel-heading">
+                  <div>
+                    <span>Step 02</span>
+                    <h2>Add the jobs you are considering</h2>
+                  </div>
+
+                  {jobs.length < 3 && (
+                    <button
+                      type="button"
+                      className="compare-add-job"
+                      onClick={() => setJobs((current) => [...current, newJob()])}
+                    >
+                      <Plus size={16} /> Add job
+                    </button>
+                  )}
+                </div>
+
+                <div className="compare-jobs-grid">
+                  {jobs.map((job, index) => (
+                    <article className="compare-job-card" key={index}>
+                      <div className="compare-job-card-top">
+                        <span>Job {String(index + 1).padStart(2, "0")}</span>
+                        {jobs.length > 2 && (
+                          <button
+                            type="button"
+                            aria-label={`Remove job ${index + 1}`}
+                            onClick={() =>
+                              setJobs((current) =>
+                                current.filter((_, jobIndex) => jobIndex !== index)
+                              )
+                            }
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+
+                      <label>
+                        <span>Job title</span>
+                        <input
+                          value={job.title}
+                          onChange={(event) => setJob(index, "title", event.target.value)}
+                          placeholder="e.g. Product Designer"
+                        />
+                      </label>
+
+                      <label>
+                        <span>Job description</span>
+                        <textarea
+                          value={job.description}
+                          onChange={(event) =>
+                            setJob(index, "description", event.target.value)
+                          }
+                          placeholder="Paste the full job description here..."
+                        />
+                      </label>
+
+                      <p>{job.description.trim().split(/\s+/).filter(Boolean).length} words</p>
+                    </article>
+                  ))}
+                </div>
+
+                {error && (
+                  <div className="compare-error">
+                    <AlertCircle size={17} />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="compare-submit"
+                  onClick={compareJobs}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={17} className="animate-spin" />
+                      Comparing opportunities…
+                    </>
+                  ) : (
+                    <>
+                      Compare jobs <ArrowRight size={17} />
+                    </>
+                  )}
+                </button>
+              </section>
             </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          ) : (
+            <div className="compare-results">
+              <section className="compare-winner">
+                <div className="compare-winner-icon"><Trophy size={24} /></div>
+                <div>
+                  <span>Best opportunity</span>
+                  <h2>{results.best_match || "Top match"}</h2>
+                  <p>
+                    This role has the strongest resume alignment based on skills,
+                    keywords, and overall semantic similarity.
+                  </p>
+                </div>
+                <div className="compare-winner-score">
+                  <strong>{Math.round(results.results?.[0]?.match_score || 0)}%</strong>
+                  <span>match score</span>
+                </div>
+              </section>
 
-            {/* Best match */}
-            <div className="card" style={{ padding: 28, textAlign: "center", background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-              <Trophy size={32} color="#16a34a" style={{ margin: "0 auto 12px" }} />
-              <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 20, color: "#111827", marginBottom: 6 }}>Best match</h2>
-              <p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 18, color: "#16a34a" }}>{results.best_match}</p>
-              <p style={{ fontFamily: "'Lato', sans-serif", fontSize: 13, color: "#64748b", marginTop: 6 }}>Based on semantic similarity and keyword analysis</p>
-            </div>
+              <section className="compare-results-heading">
+                <div>
+                  <span>Ranked results</span>
+                  <h2>Where your resume has the most potential</h2>
+                </div>
+                <p>{results.total_jobs || 0} jobs compared</p>
+              </section>
 
-            {/* Table */}
-            <div className="card" style={{ overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", borderBottom: "1px solid #e2e8f0" }}>
-                <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15, color: "#111827" }}>Comparison results</h2>
+              <div className="compare-result-grid">
+                {(results.results || []).map((job, index) => (
+                  <article
+                    key={`${job.job_title}-${index}`}
+                    className={`compare-result-card ${index === 0 ? "is-winner" : ""}`}
+                  >
+                    <div className="compare-rank">
+                      <span>#{job.rank || index + 1}</span>
+                      {index === 0 && <Trophy size={16} />}
+                    </div>
+
+                    <h3>{job.job_title || `Job ${index + 1}`}</h3>
+
+                    <div className="compare-score-row">
+                      <div>
+                        <span>Match</span>
+                        <strong className={scoreTone(job.match_score)}>
+                          {Math.round(job.match_score || 0)}%
+                        </strong>
+                      </div>
+                      <div>
+                        <span>ATS</span>
+                        <strong className={scoreTone(job.ats_score)}>
+                          {Math.round(job.ats_score || 0)}%
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="compare-bar-track">
+                      <div
+                        className={`compare-bar-fill ${scoreTone(job.match_score)}`}
+                        style={{ width: `${Math.max(0, Math.min(job.match_score || 0, 100))}%` }}
+                      />
+                    </div>
+
+                    <div className="compare-skill-section">
+                      <span><CheckCircle2 size={14} /> Matched skills</span>
+                      <div>
+                        {job.matched_skills?.length ? (
+                          job.matched_skills.slice(0, 6).map((skill) => (
+                            <em className="compare-chip matched" key={skill}>{skill}</em>
+                          ))
+                        ) : (
+                          <p>No clear matches detected.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="compare-skill-section">
+                      <span><XCircle size={14} /> Skills to strengthen</span>
+                      <div>
+                        {job.missing_skills?.length ? (
+                          job.missing_skills.slice(0, 6).map((skill) => (
+                            <em className="compare-chip missing" key={skill}>{skill}</em>
+                          ))
+                        ) : (
+                          <p>No major skill gaps detected.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={`compare-recommendation ${scoreTone(job.match_score)}`}>
+                      {job.recommendation}
+                    </div>
+                  </article>
+                ))}
               </div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      {["Rank", "Job Title", "Match", "ATS", "Matched Skills", "Missing Skills", "Status"].map(h => (
-                        <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontFamily: "'Inter', sans-serif", fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.results.map((r, i) => (
-                      <tr key={i} style={{ borderBottom: "1px solid #f1f5f9", background: i === 0 ? "#f0fdf4" : "white" }}>
-                        <td style={{ padding: "12px 16px" }}>
-                          <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 14, color: i === 0 ? "#16a34a" : i === 1 ? "#94a3b8" : "#d97706" }}>
-                            {i === 0 ? "#1" : i === 1 ? "#2" : "#3"}
-                          </span>
-                        </td>
-                        <td style={{ padding: "12px 16px", fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 13, color: "#111827" }}>{r.job_title || `Job ${i + 1}`}</td>
-                        <td style={{ padding: "12px 16px" }}><ScorePill score={r.match_score} /></td>
-                        <td style={{ padding: "12px 16px" }}><ScorePill score={r.ats_score} /></td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {r.matched_skills.slice(0, 3).map((s, j) => <span key={j} className="chip-green"><CheckCircle size={9} />{s}</span>)}
-                            {r.matched_skills.length > 3 && <span style={{ fontFamily: "'Lato', sans-serif", fontSize: 11, color: "#94a3b8" }}>+{r.matched_skills.length - 3}</span>}
-                          </div>
-                        </td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {r.missing_skills.slice(0, 3).map((s, j) => <span key={j} className="chip-red"><XCircle size={9} />{s}</span>)}
-                            {r.missing_skills.length > 3 && <span style={{ fontFamily: "'Lato', sans-serif", fontSize: 11, color: "#94a3b8" }}>+{r.missing_skills.length - 3}</span>}
-                          </div>
-                        </td>
-                        <td style={{ padding: "12px 16px" }}><RecoBadge rec={r.recommendation} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+              <div className="compare-result-actions">
+                <button type="button" onClick={() => setResults(null)}>
+                  Compare different jobs
+                </button>
+                <Link href="/analyze">
+                  Run a detailed analysis <ArrowRight size={16} />
+                </Link>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-3 justify-center">
-              <button onClick={() => setResults(null)} className="btn-primary">Compare again</button>
-              <Link href="/analyze" className="btn-secondary">Single analysis</Link>
-              <Link href="/dashboard" className="btn-secondary">Dashboard</Link>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </section>
     </main>
   );
 }
