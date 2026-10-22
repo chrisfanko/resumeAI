@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { FileText, Menu, X, LayoutDashboard, ScanText, GitCompare, Mail, PenLine } from "lucide-react";
+import { FileText, Menu, X, LayoutDashboard, ScanText, GitCompare, Mail, PenLine ,Sparkles} from "lucide-react";
 
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -28,6 +28,7 @@ export default function Navbar() {
     { href: "/cover-letter",   label: "Cover Letter",   icon: Mail },
     { href: "/resume-builder", label: "Resume Builder", icon: PenLine },
     { href: "/dashboard",      label: "Dashboard",      icon: LayoutDashboard },
+    { href: "/about",          label: "About",          icon: Sparkles },
   ];
 
   return (

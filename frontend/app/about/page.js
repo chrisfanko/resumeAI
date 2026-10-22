@@ -1,132 +1,203 @@
+"use client";
+
 import Link from "next/link";
+import Image from "next/image";
 import Navbar from "../Navbar";
-import { ArrowRight, Brain, FileSearch, BarChart3, Zap, Layers, Cpu } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  FileSearch,
+  Lightbulb,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  UploadCloud,
+} from "lucide-react";
+
+const steps = [
+  {
+    number: "01",
+    title: "Upload your resume",
+    text: "Start with the resume you already have. PDF and DOCX files are supported.",
+    icon: UploadCloud,
+  },
+  {
+    number: "02",
+    title: "Add the target role",
+    text: "Paste a job description so ResumeAI knows what the employer values.",
+    icon: Target,
+  },
+  {
+    number: "03",
+    title: "Review clear guidance",
+    text: "See match scores, missing skills, ATS checks, and improvement ideas.",
+    icon: Lightbulb,
+  },
+];
+
+const principles = [
+  {
+    title: "Practical feedback",
+    text: "Clear recommendations you can use in your next application.",
+    icon: CheckCircle2,
+  },
+  {
+    title: "Better alignment",
+    text: "Understand how your experience connects to a specific role.",
+    icon: Target,
+  },
+  {
+    title: "Built for job seekers",
+    text: "Useful tools without unnecessary complexity or jargon.",
+    icon: ShieldCheck,
+  },
+];
 
 export default function About() {
-  const steps = [
-    { step: "01", title: "Resume Parsing",     desc: "Your PDF or DOCX resume is parsed using pdfminer and python-docx to extract raw text, preserving structure and content.", tech: "pdfminer.six · python-docx", icon: FileSearch },
-    { step: "02", title: "Entity Extraction",  desc: "spaCy's Named Entity Recognition model scans the resume to extract your name, email, phone, skills, organizations, and years of experience.", tech: "spaCy en_core_web_lg", icon: Brain },
-    { step: "03", title: "Semantic Matching",  desc: "Your resume and the job description are converted into high-dimensional vectors using Sentence-BERT. Cosine similarity measures how semantically close they are.", tech: "Sentence-BERT · all-MiniLM-L6-v2", icon: Layers },
-    { step: "04", title: "ATS Simulation",     desc: "TF-IDF vectorization simulates how an Applicant Tracking System scores your resume against the job description.", tech: "scikit-learn · TF-IDF", icon: BarChart3 },
-    { step: "05", title: "Skill Gap Detection",desc: "Skills mentioned in the job description are compared against skills found in your resume. Missing skills are ranked by importance.", tech: "Custom NLP pipeline", icon: Zap },
-    { step: "06", title: "AI Suggestions",     desc: "Llama 3 reads your resume and job description to generate personalized rewrite suggestions, improved bullet points, and actionable tips.", tech: "Llama 3.3 70B · Groq API", icon: Cpu },
-  ];
-
-  const stack = [
-    { layer: "Frontend",    tech: "Next.js + Tailwind CSS" },
-    { layer: "Backend",     tech: "FastAPI (Python)" },
-    { layer: "NLP Engine",  tech: "spaCy + Sentence-BERT" },
-    { layer: "ATS Scoring", tech: "scikit-learn TF-IDF" },
-    { layer: "LLM",         tech: "Llama 3.3 via Groq" },
-    { layer: "Database",    tech: "Supabase PostgreSQL" },
-  ];
-
   return (
-    <main className="page-shell">
+    <main className="about-page">
       <Navbar />
 
-      {/* Hero */}
-      <section style={{ background: "white", padding: "64px 0 56px", borderBottom: "1px solid #e2e8f0" }}>
-        <div className="container-center" style={{ textAlign: "center" }}>
-          <span className="section-tag">ResumeAI</span>
-          <h1 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 900, fontSize: "clamp(2rem, 4vw, 3rem)", letterSpacing: "-0.03em", color: "#111827", marginBottom: 16 }}>
-            How ResumeAI works
-          </h1>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 17, lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>
-            A hybrid AI system combining traditional NLP and modern large language models to help job seekers optimize their resumes.
-          </p>
+      <section className="about-hero">
+        <div className="about-orb about-orb-one" />
+        <div className="about-orb about-orb-two" />
+
+        <div className="container-center about-hero-layout">
+          <div className="about-hero-copy">
+            <div className="about-eyebrow">
+              <Sparkles size={14} />
+              How ResumeAI works
+            </div>
+
+            <h1>
+              A clearer way to
+              <span> prepare for your next role.</span>
+            </h1>
+
+            <p>
+              ResumeAI helps job seekers turn a generic resume into an
+              application that is focused, relevant, and easier for recruiters
+              and ATS systems to understand.
+            </p>
+
+            <Link href="/analyze" className="about-primary-action">
+              Analyze my resume <ArrowRight size={17} />
+            </Link>
+          </div>
+
+          <div className="about-hero-image">
+            <Image
+              src="/images/markus-winkler-7iSEHWsxPLw-unsplash.jpg"
+              alt="A resume next to a laptop"
+              width={900}
+              height={700}
+              priority
+            />
+            <div className="about-image-card">
+              <FileSearch size={19} />
+              <div>
+                <span>Resume review</span>
+                <strong>Built around your target role</strong>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="container-center py-12" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-        {/* Problem */}
-        <div className="card" style={{ padding: 32 }}>
-          <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 20, color: "#111827", marginBottom: 14 }}>The problem</h2>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", lineHeight: 1.75, fontSize: 15, marginBottom: 12 }}>
-            Every day, thousands of qualified candidates get rejected not because they lack the skills, but because their resumes fail to communicate those skills effectively. Applicant Tracking Systems (ATS) automatically reject up to 75% of resumes before a human ever reads them.
-          </p>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", lineHeight: 1.75, fontSize: 15 }}>
-            Job seekers have no visibility into why they are being rejected or how to improve. ResumeAI solves this by giving candidates the same analytical power that enterprise recruitment tools give large corporations.
-          </p>
-        </div>
-
-        {/* How it works */}
-        <div className="card" style={{ padding: 32 }}>
-          <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 20, color: "#111827", marginBottom: 24 }}>How it works</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {steps.map((item, i) => {
-              const Icon = item.icon;
-              return (
-                <div key={i} style={{ display: "flex", gap: 16, paddingBottom: 20, borderBottom: i < steps.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-                  <div style={{ width: 40, height: 40, background: "#f0fdf4", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Icon size={18} color="#16a34a" />
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                      <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 11, color: "#94a3b8", letterSpacing: "0.06em" }}>{item.step}</span>
-                      <h3 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15, color: "#111827" }}>{item.title}</h3>
-                    </div>
-                    <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 14, lineHeight: 1.65, marginBottom: 8 }}>{item.desc}</p>
-                    <span style={{ background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", padding: "3px 12px", borderRadius: 100, fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 11 }}>
-                      {item.tech}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+      <section className="about-process-section">
+        <div className="container-center">
+          <div className="about-section-heading centered-about-heading">
+            <div className="about-eyebrow">A simple process</div>
+            <h2>Three steps to a stronger application.</h2>
+            <p>Focus less on guessing and more on communicating your value.</p>
           </div>
-        </div>
 
-        {/* Tech Stack */}
-        <div className="card" style={{ padding: 32 }}>
-          <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 20, color: "#111827", marginBottom: 20 }}>Tech stack</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {stack.map((item, i) => (
-              <div key={i} style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", border: "1px solid #e2e8f0" }}>
-                <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>{item.layer}</p>
-                <p style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13, color: "#111827" }}>{item.tech}</p>
-              </div>
+          <div className="about-steps-grid">
+            {steps.map(({ number, title, text, icon: Icon }) => (
+              <article className="about-step-card" key={number}>
+                <div className="about-step-top">
+                  <span>{number}</span>
+                  <div><Icon size={21} /></div>
+                </div>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
             ))}
           </div>
         </div>
+      </section>
 
-        {/* Architecture */}
-        <div className="card" style={{ padding: 32 }}>
-          <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 20, color: "#111827", marginBottom: 14 }}>Architecture</h2>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "#64748b", fontSize: 15, lineHeight: 1.7, marginBottom: 16 }}>
-            ResumeAI uses a decoupled client-server architecture. The Next.js frontend communicates with the FastAPI backend via REST API calls. The backend orchestrates three AI models working in a pipeline — spaCy for extraction, Sentence-BERT for semantic analysis, and Llama 3 for generative suggestions.
-          </p>
-          <div style={{ background: "#f8fafc", borderRadius: 10, padding: "20px 24px", border: "1px solid #e2e8f0", fontFamily: "'Courier New', monospace", fontSize: 13, color: "#374151", lineHeight: 2 }}>
-            <p style={{ color: "#16a34a", fontWeight: 700 }}>Next.js Frontend</p>
-            <p style={{ paddingLeft: 20, color: "#64748b" }}>↓ HTTP POST /api/analyze</p>
-            <p style={{ color: "#16a34a", fontWeight: 700 }}>FastAPI Backend</p>
-            <p style={{ paddingLeft: 20, color: "#64748b" }}>↓ parse_resume()</p>
-            <p style={{ paddingLeft: 20, color: "#64748b" }}>↓ extract_entities()   — spaCy</p>
-            <p style={{ paddingLeft: 20, color: "#64748b" }}>↓ calculate_match()    — Sentence-BERT</p>
-            <p style={{ paddingLeft: 20, color: "#64748b" }}>↓ calculate_ats()      — TF-IDF</p>
-            <p style={{ paddingLeft: 20, color: "#64748b" }}>↓ generate_suggestions() — Llama 3</p>
-            <p style={{ color: "#16a34a", fontWeight: 700 }}>JSON Response → Results Page</p>
+      <section className="about-story-section">
+        <div className="container-center about-story-layout">
+          <div className="about-story-image">
+            <Image
+              src="/images/glenn-carstens-peters-npxXWgQ33ZQ-unsplash.jpg"
+              alt="Job seekers working together"
+              width={800}
+              height={680}
+            />
+          </div>
+
+          <div className="about-story-copy">
+            <div className="about-eyebrow">Designed for clarity</div>
+            <h2>Your experience is valuable. Your resume should make that obvious.</h2>
+            <p>
+              The job search can feel like a black box. ResumeAI gives you a
+              clearer picture of how your resume matches a role, which details
+              need more emphasis, and where there is room to improve.
+            </p>
+
+            <div className="about-highlight-list">
+              <div>
+                <BarChart3 size={18} />
+                <p><strong>Match scores</strong> show your current alignment.</p>
+              </div>
+              <div>
+                <FileSearch size={18} />
+                <p><strong>Skill-gap insights</strong> reveal what to strengthen.</p>
+              </div>
+              <div>
+                <Lightbulb size={18} />
+                <p><strong>AI suggestions</strong> help you make useful changes.</p>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* CTA */}
-        <div style={{ background: "#16a34a", borderRadius: 16, padding: "48px 32px", textAlign: "center" }}>
-          <h2 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 900, fontSize: "clamp(1.6rem, 2.5vw, 2rem)", letterSpacing: "-0.025em", color: "white", marginBottom: 12 }}>
-            Try it yourself
-          </h2>
-          <p style={{ fontFamily: "'Lato', sans-serif", color: "rgba(255,255,255,0.75)", fontSize: 15, marginBottom: 24 }}>
-            Upload your resume and see the full analysis in seconds.
-          </p>
-          <Link href="/analyze" style={{ background: "white", color: "#16a34a", fontFamily: "'Inter', sans-serif", fontWeight: 700, padding: "13px 28px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 8, fontSize: 15, textDecoration: "none" }}>
-            Analyze my resume <ArrowRight size={15} />
+      <section className="about-principles-section">
+        <div className="container-center">
+          <div className="about-section-heading">
+            <div className="about-eyebrow">What guides us</div>
+            <h2>Career support that stays useful.</h2>
+          </div>
+
+          <div className="about-principles-grid">
+            {principles.map(({ title, text, icon: Icon }) => (
+              <article key={title}>
+                <div><Icon size={20} /></div>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="about-cta-section">
+        <div className="container-center about-cta-content">
+          <div>
+            <div className="about-eyebrow about-light-eyebrow">Ready when you are</div>
+            <h2>See what your resume could do better.</h2>
+            <p>Upload it, add a role, and get focused feedback in minutes.</p>
+          </div>
+
+          <Link href="/analyze" className="about-light-action">
+            Start free analysis <ArrowRight size={17} />
           </Link>
         </div>
-      </div>
-
-      <footer style={{ borderTop: "1px solid #e2e8f0", padding: "28px 0", textAlign: "center" }}>
-        <p style={{ fontFamily: "'Lato', sans-serif", color: "#94a3b8", fontSize: 13 }}>© 2026 ResumeAI — Final Year Project</p>
-      </footer>
+      </section>
     </main>
   );
 }
